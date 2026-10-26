@@ -18,7 +18,7 @@
         <p class="mu" aria-live="polite"><span data-selected-count>{{ count($selectedParticipantIds) }}</span> pegawai dipilih</p>
         <div class="box" style="max-height:15rem;overflow:auto" data-participant-list>
             @foreach($employees as $person)
-                <label class="flex items-center gap-2" data-participant-row>
+                <label class="participant-row flex items-center gap-2" data-participant-row>
                     <input type="checkbox" name="peserta[]" value="{{ $person->id }}" style="width:auto" @checked(in_array((string) $person->id, $selectedParticipantIds, true))>
                     <span>{{ $person->nama }} · {{ $person->nip }} · {{ $person->jabatan }}</span>
                 </label>

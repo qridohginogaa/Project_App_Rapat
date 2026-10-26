@@ -43,6 +43,20 @@ final class MeetingData
             && now()->lt(\Illuminate\Support\Carbon::parse($expires, config('app.timezone')));
     }
 
+    public static function canManuallyEnd(array|object $meeting): bool
+    {
+        if (data_get($meeting, 'ended_at')) {
+            return false;
+        }
+
+        $starts = \Illuminate\Support\Carbon::parse(
+            data_get($meeting, 'tanggal').' '.data_get($meeting, 'mulai'),
+            config('app.timezone')
+        );
+
+        return $starts->isToday() && now()->greaterThanOrEqualTo($starts);
+    }
+
     public static function code(int $length = 6): string
     {
         $characters = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';

@@ -287,8 +287,8 @@
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div><label>Tanggal</label><input type="date" name="tanggal" value="{{ old('tanggal', $meeting->tanggal) }}" required></div>
                 <div><label>Moda</label><select name="moda">@foreach(['Luring','Daring','Hybrid'] as $mode)<option @selected(old('moda', $meeting->moda) === $mode)>{{ $mode }}</option>@endforeach</select></div>
-                <div><label>Mulai (format 24 jam)</label><input type="text" name="mulai" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" placeholder="HH:MM" title="Masukkan waktu 24 jam, contoh 13:30" value="{{ old('mulai', substr($meeting->mulai, 0, 5)) }}" required></div>
-                <div><label>Selesai (format 24 jam)</label><input type="text" name="selesai" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" placeholder="HH:MM" title="Masukkan waktu 24 jam, contoh 16:00" value="{{ old('selesai', substr($meeting->selesai, 0, 5)) }}" required></div>
+                <div>@include('partials.meeting-time-select', ['name' => 'mulai', 'label' => 'Mulai', 'selectedTime' => old('mulai', substr($meeting->mulai, 0, 5))])</div>
+                <div>@include('partials.meeting-time-select', ['name' => 'selesai', 'label' => 'Selesai', 'selectedTime' => old('selesai', substr($meeting->selesai, 0, 5))])</div>
                 <div><label>Ruang</label><select name="room_id"><option value="">Tidak memilih ruang</option>@foreach($rooms as $room)<option value="{{ $room->id }}" @selected((string) old('room_id', $meeting->room_id) === (string) $room->id)>{{ $room->nama }}{{ !$room->aktif ? ' (nonaktif)' : '' }}</option>@endforeach</select></div>
                 <div><label>Tempat lain</label><input name="tempat" value="{{ old('tempat', $meeting->tempat) }}"></div>
                 <div><label>Tautan meeting HTTPS</label><input type="url" name="link_meeting" value="{{ old('link_meeting', $meeting->link_meeting) }}"></div>
@@ -384,7 +384,7 @@
                 <td>{{ ucfirst($scheduleStatus) }}</td><td>@if($canViewAttendance)<a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">{{ $isSuperAdmin ? (\App\Support\MeetingData::attendanceOpen($meeting) ? 'Kode '.$meeting->kode_presensi : 'Atur kode') : 'Lihat presensi' }}</a>@endif</td>
                 <td><div class="flex flex-wrap gap-2">@if($canCreateMeetings)<a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'edit' => $meeting->id]) }}">Ubah</a>
                     <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Hapus rapat ini?')">@csrf<input type="hidden" name="aksi" value="hapus_rapat"><input type="hidden" name="id" value="{{ $meeting->id }}"><button class="btn sm red">Hapus</button></form>@endif
-                    @if($canEndMeetings && $scheduleStatus === 'berlangsung')
+                    @if($canEndMeetings && \App\Support\MeetingData::canManuallyEnd($meeting))
                     <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Tandai rapat ini sebagai selesai sekarang? Tindakan ini tidak dapat dibatalkan.')">@csrf<input type="hidden" name="aksi" value="selesaikan_rapat"><input type="hidden" name="id" value="{{ $meeting->id }}"><button class="btn sm" style="background:#f59e0b;color:#fff;border-color:#f59e0b;">✓ Selesaikan</button></form>
                     @endif
                 </div></td></tr>

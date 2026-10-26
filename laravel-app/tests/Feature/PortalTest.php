@@ -364,7 +364,7 @@ class PortalTest extends TestCase
             ->assertDontSee('Pegawai masuk')
             ->assertDontSee('admin-menu-toggle')
             ->assertDontSee('Live Board Rapat')
-            ->assertDontSee('Mulai (format 24 jam)');
+            ->assertDontSee('Jam Mulai');
         $this->get('/')
             ->assertOk()
             ->assertDontSee('Pegawai yang wajib mengikuti')
@@ -504,9 +504,21 @@ class PortalTest extends TestCase
 
         $this->get('/admin/rapat?edit=1')
             ->assertOk()
-            ->assertSee('Mulai (format 24 jam)')
-            ->assertSee('Selesai (format 24 jam)')
-            ->assertSee('placeholder="HH:MM"', false)
+            ->assertSee('Jam Mulai')
+            ->assertSee('Jam Selesai')
+            ->assertSee('<label for="mulai-hour">Jam</label>', false)
+            ->assertSee('<label for="mulai-minute">Menit</label>', false)
+            ->assertSee('<label for="selesai-hour">Jam</label>', false)
+            ->assertSee('<label for="selesai-minute">Menit</label>', false)
+            ->assertSee('id="mulai-hour"', false)
+            ->assertSee('id="mulai-minute"', false)
+            ->assertSee('id="selesai-hour"', false)
+            ->assertSee('id="selesai-minute"', false)
+            ->assertSee('<option value="00" ', false)
+            ->assertSee('<option value="23" ', false)
+            ->assertSee('<option value="59" ', false)
+            ->assertSee('type="hidden" name="mulai" value="09:00"', false)
+            ->assertSee('type="hidden" name="selesai" value="11:00"', false)
             ->assertSee('Pegawai yang wajib mengikuti')
             ->assertSee('name="semua_pegawai"', false)
             ->assertSee('Rapat untuk semua pegawai')
@@ -729,7 +741,7 @@ class PortalTest extends TestCase
             'judul' => 'Rapat Diakhiri Manual',
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subMinutes(20)->format('H:i'),
-            'selesai' => now()->addHour()->format('H:i'),
+            'selesai' => now()->subMinutes(5)->format('H:i'),
             'moda' => 'Luring',
             'kode_presensi' => 'MASUK8',
             'presensi_kedaluwarsa' => now()->addMinutes(20),
@@ -765,6 +777,11 @@ class PortalTest extends TestCase
             ->assertSee('Belum Absen Pulang')
             ->assertSee('Keterangan / alasan tidak mengisi absen pulang')
             ->assertSee('Alasan pulang duluan');
+        $this->withSession(['admin_id' => 1])->get('/admin/rapat?presensi='.$meetingId)
+            ->assertOk()
+            ->assertSee('Kode absen pulang aktif')
+            ->assertSee('Tutup kode absen pulang')
+            ->assertSee('Buat kode absen pulang');
         $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'simpan_alasan_pulang',
             'alasan_pulang' => 'Ada keperluan keluarga.',
@@ -790,10 +807,10 @@ class PortalTest extends TestCase
         ]);
         DB::table('admin_pegawai')->insert(['pegawai_id' => $employeeId]);
         $meetingId = DB::table('rapat')->insertGetId([
-            'judul' => 'Rapat Tidak Boleh Ditutup Admin',
+            'judul' => 'Rapat Dapat Diakhiri Pengelola',
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subMinutes(20)->format('H:i'),
-            'selesai' => now()->addHour()->format('H:i'),
+            'selesai' => now()->subMinutes(10)->format('H:i'),
             'moda' => 'Luring',
         ]);
 
@@ -811,6 +828,13 @@ class PortalTest extends TestCase
         ])->get('/')
             ->assertOk()
             ->assertSee('Selesaikan Rapat');
+        $this->withSession([
+            'employee_id' => $employeeId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
+            'active_role' => 'admin',
+        ])->get('/admin/rapat')
+            ->assertOk()
+            ->assertSee('✓ Selesaikan');
 
         $this->withSession([
             'employee_id' => $employeeId,
@@ -819,8 +843,47 @@ class PortalTest extends TestCase
         ])->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'selesaikan_rapat',
         ])->assertRedirect('/meetings/'.$meetingId);
-        $this->assertNotNull(DB::table('rapat')->where('id', $meetingId)->value('ended_at'));
-        $this->assertNotEmpty(DB::table('rapat')->where('id', $meetingId)->value('kode_presensi_pulang'));
+        $meeting = DB::table('rapat')->where('id', $meetingId)->first();
+        $this->assertNotNull($meeting->ended_at);
+        $this->assertNotEmpty($meeting->kode_presensi_pulang);
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($meeting->presensi_pulang_kedaluwarsa)
+            ->equalTo(\Illuminate\Support\Carbon::parse($meeting->ended_at)->addMinutes(30)));
+    }
+
+    public function test_meeting_from_a_past_date_cannot_be_manually_ended(): void
+    {
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Admin Rapat Lama',
+            'jabatan' => 'Admin',
+            'password_hash' => Hash::make('password-tes'),
+        ]);
+        DB::table('admin_pegawai')->insert(['pegawai_id' => $employeeId]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Tanggal Lampau',
+            'tanggal' => now()->subDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
+            'active_role' => 'admin',
+        ];
+
+        $this->withSession($session)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertDontSee('Selesaikan Rapat');
+        $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'selesaikan_rapat',
+        ])->assertStatus(409);
+
+        $this->assertDatabaseHas('rapat', [
+            'id' => $meetingId,
+            'ended_at' => null,
+            'kode_presensi_pulang' => null,
+        ]);
     }
 
     public function test_live_board_is_public_and_has_no_admin_navigation(): void
@@ -1020,6 +1083,19 @@ class PortalTest extends TestCase
         }
         DB::table('admin_pegawai')->insert(['pegawai_id' => $employeeId]);
         DB::table('manager_access_settings')->where('id', 1)->update(['buat_rapat' => true]);
+
+        $this->withSession([
+            'employee_id' => $employeeId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
+        ])->get('/')
+            ->assertOk()
+            ->assertSee('id="mulai-hour"', false)
+            ->assertSee('<option value="09" selected>09</option>', false)
+            ->assertSee('<option value="00" selected>00</option>', false)
+            ->assertSee('<option value="11" selected>11</option>', false)
+            ->assertSee('<option value="59" ', false)
+            ->assertSee('type="hidden" name="mulai" value="09:00"', false)
+            ->assertSee('type="hidden" name="selesai" value="11:00"', false);
 
         $this->withSession([
             'employee_id' => $employeeId,
@@ -1486,13 +1562,19 @@ class PortalTest extends TestCase
             'judul' => 'Rapat Presensi',
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subHour()->format('H:i'),
-            'selesai' => now()->addHour()->format('H:i'),
+            'selesai' => now()->subMinutes(5)->format('H:i'),
             'moda' => 'Luring',
             'kode_presensi' => 'RAPAT7',
             'presensi_kedaluwarsa' => now()->addMinutes(20)->toDateTimeString(),
         ]);
 
-        $this->withSession(['employee_id' => $employeeId, 'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash')])
+        $session = ['employee_id' => $employeeId, 'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash')];
+        $this->withSession($session)
+            ->get('/')
+            ->assertOk()
+            ->assertSee('🟢 Presensi buka');
+
+        $this->withSession($session)
             ->post('/meetings/'.$meetingId.'/actions', ['aksi' => 'hadir', 'kode' => 'RAPAT7'])
             ->assertRedirect();
 
@@ -1501,6 +1583,11 @@ class PortalTest extends TestCase
             'pegawai_id' => $employeeId,
             'status' => 'hadir',
         ]);
+        $this->withSession($session)
+            ->get('/')
+            ->assertOk()
+            ->assertDontSee('🟢 Presensi buka')
+            ->assertDontSee('Presensi pulang buka');
     }
 
     public function test_employee_can_submit_checkout_code_after_meeting_ends(): void
@@ -1532,6 +1619,10 @@ class PortalTest extends TestCase
             'employee_id' => $employeeId,
             'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
         ];
+        $this->withSession($session)
+            ->get('/')
+            ->assertOk()
+            ->assertSee('🟢 Presensi pulang buka');
         $this->withSession($session)->get('/meetings/'.$meetingId)
             ->assertOk()
             ->assertSee('Belum Absen Pulang')
@@ -1541,6 +1632,10 @@ class PortalTest extends TestCase
             'kode' => 'PULANG7',
         ])->assertRedirect();
         $this->assertNotNull(DB::table('kehadiran')->where('id', $attendanceId)->value('waktu_pulang'));
+        $this->withSession($session)
+            ->get('/')
+            ->assertOk()
+            ->assertDontSee('Presensi pulang buka');
     }
 
     public function test_employee_cannot_submit_checkout_code_before_meeting_ends(): void

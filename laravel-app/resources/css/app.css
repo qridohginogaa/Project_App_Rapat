@@ -13,6 +13,10 @@ body {
     animation: page-enter 420ms ease-out both;
 }
 
+.participant-row[hidden] {
+    display: none !important;
+}
+
 .employee-identity {
     display: flex;
     flex-direction: column;

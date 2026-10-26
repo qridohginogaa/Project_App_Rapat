@@ -117,7 +117,7 @@ class PortalController extends Controller
             ->leftJoin('kehadiran as k', function ($join) use ($employee) {
                 $join->on('k.rapat_id', '=', 'r.id')->where('k.pegawai_id', '=', $employee->id ?? 0);
             })
-            ->select('r.*', 'k.status as status_kehadiran', 'k.status_izin')
+            ->select('r.*', 'k.status as status_kehadiran', 'k.status_izin', 'k.waktu', 'k.waktu_pulang')
             ->selectSub(
                 DB::table('kehadiran as hadir')->selectRaw('COUNT(*)')->whereColumn('hadir.rapat_id', 'r.id')->where('hadir.status', 'hadir'),
                 'jumlah_hadir'
@@ -1096,7 +1096,7 @@ class PortalController extends Controller
 
         if ($action === 'selesaikan_rapat') {
             abort_unless($admin, 403);
-            abort_unless(MeetingData::scheduleStatus($record) === 'berlangsung', 409, 'Rapat tidak sedang berlangsung.');
+            abort_unless(MeetingData::canManuallyEnd($record), 409, 'Rapat belum dimulai atau sudah diselesaikan.');
 
             $checkoutCode = MeetingData::code();
             while ($checkoutCode === $record->kode_presensi) {

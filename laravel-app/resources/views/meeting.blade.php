@@ -5,7 +5,7 @@
 <div class="flex items-center justify-between gap-3 flex-wrap">
     <a href="{{ route('dashboard') }}">← Kembali ke dashboard</a>
     @if($isAdmin)<a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">🔑 Kelola presensi</a>@endif
-    @if($isAdmin && $scheduleStatus === 'berlangsung')
+    @if($isAdmin && \App\Support\MeetingData::canManuallyEnd($meeting))
         <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">
             @csrf<input type="hidden" name="aksi" value="selesaikan_rapat">
             <button class="btn sm red">Selesaikan Rapat</button>

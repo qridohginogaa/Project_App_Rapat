@@ -37,12 +37,13 @@
                             <p class="mu">{{ \App\Support\MeetingData::date($meeting->tanggal) }} · {{ $meeting->tempat ?: 'Tempat belum ditentukan' }} · {{ $meeting->moda }} · 👥 {{ $meeting->jumlah_hadir }} hadir</p>
                         </div>
                     </a>
-                    @if(\App\Support\MeetingData::attendanceOpen($meeting))<span class="tag hadir">🟢 Presensi buka</span>@endif
+                    @if(\App\Support\MeetingData::attendanceOpen($meeting) && (!$employee || !$meeting->status_kehadiran))<span class="tag hadir">🟢 Presensi buka</span>@endif
+                    @if($employee && $meeting->status_kehadiran === 'hadir' && !$meeting->waktu_pulang && \App\Support\MeetingData::checkoutOpen($meeting))<span class="tag hadir">🟢 Presensi pulang buka</span>@endif
                     @if($employee)<span class="tag {{ $meeting->status_kehadiran ?: 'kosong' }}">{{ $meeting->status_kehadiran === 'hadir' ? 'Hadir' : ($meeting->status_kehadiran === 'izin' ? 'Izin '.$meeting->status_izin : 'Belum presensi') }}</span>@endif
                     @if(!$employee && $scheduleStatus === 'berlangsung' && $previewRoom)
                         <a class="btn sm" href="{{ route('live-board', ['room_id' => $previewRoom->id]) }}">Preview Live Board</a>
                     @endif
-                    @if($scheduleStatus === 'berlangsung' && $canEndMeetings)
+                    @if($canEndMeetings && \App\Support\MeetingData::canManuallyEnd($meeting))
                         <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">
                             @csrf<input type="hidden" name="aksi" value="selesaikan_rapat">
                             <button class="btn sm red">Selesaikan Rapat</button>
@@ -73,8 +74,8 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div><label>Tanggal</label><input type="date" name="tanggal" required value="{{ old('tanggal', now()->toDateString()) }}"></div>
                     <div><label>Moda</label><select name="moda"><option>Luring</option><option>Daring</option><option>Hybrid</option></select></div>
-                    <div><label>Mulai (format 24 jam)</label><input type="text" name="mulai" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" placeholder="HH:MM" title="Masukkan waktu 24 jam, contoh 13:30" required value="{{ old('mulai', '09:00') }}"></div>
-                    <div><label>Selesai (format 24 jam)</label><input type="text" name="selesai" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" maxlength="5" placeholder="HH:MM" title="Masukkan waktu 24 jam, contoh 16:00" required value="{{ old('selesai', '11:00') }}"></div>
+                    <div>@include('partials.meeting-time-select', ['name' => 'mulai', 'label' => 'Mulai', 'selectedTime' => old('mulai', '09:00')])</div>
+                    <div>@include('partials.meeting-time-select', ['name' => 'selesai', 'label' => 'Selesai', 'selectedTime' => old('selesai', '11:00')])</div>
                     <div><label>Ruang rapat</label><select name="room_id"><option value="">Tidak memilih ruang</option>@foreach($rooms as $room)<option value="{{ $room->id }}">{{ $room->nama }}</option>@endforeach</select></div>
                     <div><label>Tautan meeting HTTPS (opsional)</label><input type="url" name="link_meeting"></div>
                     <div><label>Pimpinan rapat (opsional)</label><input name="pimpinan" list="employees"></div>
