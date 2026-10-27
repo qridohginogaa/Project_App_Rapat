@@ -38,7 +38,7 @@
         @endif
     </div>
     <div class="bar"></div>
-    @if(request()->routeIs('dashboard') && isset($employee) && $employee && $canAccessAdminMenu)
+    @if((request()->routeIs('dashboard') || request()->routeIs('meetings.show')) && isset($employee) && $employee && $canAccessAdminMenu)
         <div class="wrap admin-menu">
             <details>
                 <summary class="btn admin-menu-toggle" aria-label="Buka menu fitur" title="Menu fitur">

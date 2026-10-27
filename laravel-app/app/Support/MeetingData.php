@@ -8,11 +8,8 @@ final class MeetingData
 {
     public static function status(array|object $meeting): string
     {
-        if (data_get($meeting, 'ended_at')) {
-            return 'selesai';
-        }
-        $date = data_get($meeting, 'tanggal');
-        return $date < now()->toDateString() ? 'selesai' : ($date === now()->toDateString() ? 'hari' : 'akan');
+        $status = self::scheduleStatus($meeting);
+        return $status === 'berlangsung' ? 'hari' : $status;
     }
 
     public static function scheduleStatus(array|object $meeting): string

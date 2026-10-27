@@ -4,8 +4,8 @@
 @php($scheduleStatus = \App\Support\MeetingData::scheduleStatus($meeting))
 <div class="flex items-center justify-between gap-3 flex-wrap">
     <a href="{{ route('dashboard') }}">← Kembali ke dashboard</a>
-    @if($isAdmin)<a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">🔑 Kelola presensi</a>@endif
-    @if($isAdmin && \App\Support\MeetingData::canManuallyEnd($meeting))
+    @if($showMeetingAdminTools)<a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">🔑 Kelola presensi</a>@endif
+    @if($showMeetingAdminTools && \App\Support\MeetingData::canManuallyEnd($meeting))
         <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">
             @csrf<input type="hidden" name="aksi" value="selesaikan_rapat">
             <button class="btn sm red">Selesaikan Rapat</button>
@@ -34,23 +34,41 @@
     @endif
 </div>
 
-@if($attendanceOnly)
+@if($employeeAttendanceOnly)
     <h2>Presensi rapat</h2>
     <div class="box">
         <p>Pegawai: <b>{{ $employee->nama }}</b></p>
         @if($attendance)
             <span class="tag {{ $attendance->status }}">{{ $attendance->status === 'hadir' ? 'Hadir' : 'Izin '.$attendance->status_izin }}</span>
             <p>{{ $attendance->status === 'hadir' ? 'Presensi Anda sudah tercatat pada '.substr($attendance->waktu, 11, 5).' WITA.' : 'Status izin Anda sudah tercatat.' }}</p>
-        @elseif(\App\Support\MeetingData::attendanceOpen($meeting))
-            <p class="mu">Kode presensi aktif sampai {{ substr($meeting->presensi_kedaluwarsa, 11, 5) }} WITA.</p>
+        @else
+            @if(\App\Support\MeetingData::attendanceOpen($meeting))
+                <p class="mu">Kode presensi aktif sampai {{ substr($meeting->presensi_kedaluwarsa, 11, 5) }} WITA.</p>
+            @else
+                <p class="mu">Menunggu kode presensi dibuat atau diberikan oleh Pengelola Rapat. Anda dapat mengisi kode di bawah setelah menerimanya.</p>
+            @endif
             <form method="post" action="{{ route('meetings.action', $meeting->id) }}">@csrf<input type="hidden" name="aksi" value="hadir">
                 <label>Kode presensi</label><input name="kode" required maxlength="15" autocomplete="off">
                 <button class="btn pri mt-3">Kirim &amp; catat hadir</button>
             </form>
-        @else
-            <p class="mu">Presensi belum dibuka atau batas waktu pengisian telah berakhir.</p>
         @endif
     </div>
+    @if($attendance && $attendance->status === 'hadir' && \App\Support\MeetingData::checkoutOpen($meeting))
+        <h2>Absen pulang</h2>
+        <div class="box">
+            @if($attendance->waktu_pulang)
+                <span class="tag hadir">Sudah Absen Pulang</span>
+                <p>Absen pulang tercatat pada {{ substr($attendance->waktu_pulang, 11, 5) }} WITA.</p>
+            @else
+                <span class="tag hadir">Absen pulang dibuka</span>
+                <p class="mu">Kode absen pulang</p>
+                <form method="post" action="{{ route('meetings.action', $meeting->id) }}">@csrf<input type="hidden" name="aksi" value="absen_pulang">
+                    <label>Kode absen pulang</label><input name="kode" required maxlength="20" autocomplete="off">
+                    <button class="btn pri mt-3">Kirim absen pulang</button>
+                </form>
+            @endif
+        </div>
+    @endif
     @if($canViewAttendance)
         <h2>Daftar absen masuk ({{ $attendees->count() }})</h2>
         <div class="tw"><table><thead><tr><th>#</th><th>Nama</th><th>NIP</th><th>Waktu masuk</th></tr></thead><tbody>
@@ -80,7 +98,7 @@
         </tbody></table></div>
     @endif
 @else
-    @if($isAdmin)
+    @if($showMeetingAdminTools)
         <h2>Pengelolaan kode presensi <span class="tag hadir">Khusus Super Admin</span></h2>
         @if(!$isSuperAdmin)
             <div class="box">
@@ -153,21 +171,26 @@
         </tbody></table></div>
     @endif
 
-    @if($employee && $attendance && $attendance->status === 'hadir' && $scheduleStatus === 'selesai')
+    @if($employee && $attendance && $attendance->status === 'hadir' && ($scheduleStatus === 'selesai' || \App\Support\MeetingData::checkoutOpen($meeting)))
         <h2>Absen pulang</h2>
         <div class="box">
             @if($attendance->waktu_pulang)
                 <span class="tag hadir">Sudah Absen Pulang</span>
                 <p>Absen pulang tercatat pada {{ substr($attendance->waktu_pulang, 11, 5) }} WITA.</p>
             @else
-                <span class="tag selesai">Belum Absen Pulang</span>
-                <p class="mu">Alasan pulang duluan: silakan isi keterangan di bawah.</p>
-                <form method="post" action="{{ route('meetings.action', $meeting->id) }}" class="mt-3">
-                    @csrf<input type="hidden" name="aksi" value="simpan_alasan_pulang">
-                    <label>Keterangan / alasan tidak mengisi absen pulang</label>
-                    <textarea name="alasan_pulang" required maxlength="2000" rows="3">{{ old('alasan_pulang', $attendance->alasan_pulang) }}</textarea>
-                    <button class="btn sm mt-2">Simpan keterangan</button>
-                </form>
+                @if($scheduleStatus === 'selesai')
+                    <span class="tag selesai">Belum Absen Pulang</span>
+                    <p class="mu">Alasan pulang duluan: silakan isi keterangan di bawah.</p>
+                    <form method="post" action="{{ route('meetings.action', $meeting->id) }}" class="mt-3">
+                        @csrf<input type="hidden" name="aksi" value="simpan_alasan_pulang">
+                        <label>Keterangan / alasan tidak mengisi absen pulang</label>
+                        <textarea name="alasan_pulang" required maxlength="2000" rows="3">{{ old('alasan_pulang', $attendance->alasan_pulang) }}</textarea>
+                        <button class="btn sm mt-2">Simpan keterangan</button>
+                    </form>
+                @else
+                    <span class="tag hadir">Absen pulang dibuka</span>
+                    <p class="mu">Kode absen pulang</p>
+                @endif
                 @if(\App\Support\MeetingData::checkoutOpen($meeting))
                     <form method="post" action="{{ route('meetings.action', $meeting->id) }}">@csrf<input type="hidden" name="aksi" value="absen_pulang">
                         <label>Kode absen pulang</label><input name="kode" required maxlength="20" autocomplete="off">

@@ -4,7 +4,7 @@
 @php
     $tabs = ['rapat' => 'Rapat', 'ruang' => 'Ruang Rapat', 'kehadiran' => 'Kehadiran & Izin', 'pegawai' => 'Pegawai', 'superadmin' => 'Hak Akses', 'pengaturan' => 'Pengaturan'];
 @endphp
-@if($canReturnToEmployeeDashboard && in_array($tab, ['rapat', 'kehadiran'], true))
+@if($canReturnToEmployeeDashboard || $isSuperAdmin)
     <a class="btn mb-3" href="{{ route('dashboard') }}">← Kembali ke Dashboard</a>
 @endif
 <nav class="tabs flex flex-wrap gap-2 mb-4">
@@ -292,18 +292,24 @@
                 <div><label>Ruang</label><select name="room_id"><option value="">Tidak memilih ruang</option>@foreach($rooms as $room)<option value="{{ $room->id }}" @selected((string) old('room_id', $meeting->room_id) === (string) $room->id)>{{ $room->nama }}{{ !$room->aktif ? ' (nonaktif)' : '' }}</option>@endforeach</select></div>
                 <div><label>Tempat lain</label><input name="tempat" value="{{ old('tempat', $meeting->tempat) }}"></div>
                 <div><label>Tautan meeting HTTPS</label><input type="url" name="link_meeting" value="{{ old('link_meeting', $meeting->link_meeting) }}"></div>
-                <div><label>Tautan rekaman Google Drive</label><input type="url" name="link_rekaman" value="{{ old('link_rekaman', $meeting->link_rekaman) }}"></div>
+                @if($canManageRecordings)
+                    <div><label>Tautan rekaman Google Drive / YouTube</label><input type="url" name="link_rekaman" value="{{ old('link_rekaman', $meeting->link_rekaman) }}"></div>
+                @endif
                 <div><label>Pimpinan</label><input name="pimpinan" value="{{ old('pimpinan', $meeting->pimpinan) }}"></div>
                 <div><label>Notulis</label><input name="notulis" value="{{ old('notulis', $meeting->notulis) }}"></div>
                 <div><label>Pemateri</label><input name="pemateri" value="{{ old('pemateri', $meeting->pemateri) }}"></div>
             </div>
             @include('partials.meeting-participants', ['participantPrefix' => 'admin-meeting'])
             <label>Agenda</label><textarea name="agenda" rows="4">{{ old('agenda', $meeting->agenda) }}</textarea>
-            <label>Notulen</label><textarea name="notulen" rows="5">{{ old('notulen', $meeting->notulen) }}</textarea>
-            <label>PDF notulen (maks. 15 MB)</label><input type="file" name="file_notulen" accept=".pdf">
-            @if($meeting->file_notulen)<label><input type="checkbox" name="hapus_file_notulen" value="1" style="width:auto"> Hapus PDF saat menyimpan</label>@endif
-            <label>Unggah materi (maks. 20 MB)</label><input type="file" name="materi_rapat" accept=".pdf,.ppt,.pptx,.doc,.docx,.zip">
-            @if($meeting->materi_rapat)<label><input type="checkbox" name="hapus_materi_rapat" value="1" style="width:auto"> Hapus materi lama saat menyimpan</label>@endif
+            @if($canEditMinutes)
+                <label>Notulen</label><textarea name="notulen" rows="5">{{ old('notulen', $meeting->notulen) }}</textarea>
+                <label>PDF notulen (maks. 15 MB)</label><input type="file" name="file_notulen" accept=".pdf">
+                @if($meeting->file_notulen)<label><input type="checkbox" name="hapus_file_notulen" value="1" style="width:auto"> Hapus PDF saat menyimpan</label>@endif
+            @endif
+            @if($canManageMaterials)
+                <label>Unggah materi (maks. 20 MB)</label><input type="file" name="materi_rapat" accept=".pdf,.ppt,.pptx,.doc,.docx,.zip">
+                @if($meeting->materi_rapat)<label><input type="checkbox" name="hapus_materi_rapat" value="1" style="width:auto"> Hapus materi lama saat menyimpan</label>@endif
+            @endif
             <div class="flex flex-wrap gap-2 mt-3"><button class="btn pri">Simpan rapat</button><a class="btn" href="{{ route('admin', 'rapat') }}">Batal</a></div>
         </form>
     @else

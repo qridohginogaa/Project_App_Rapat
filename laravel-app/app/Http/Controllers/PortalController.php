@@ -147,8 +147,8 @@ class PortalController extends Controller
             'isSuperAdmin' => $this->isSuperAdminMode() || $this->isEmployeeSuperAdmin($employee),
             'canEndMeetings' => $this->isAdminMode(),
             'canSwitchRole' => $this->isEmployeeAdmin($employee),
-            'canAccessAdminMenu' => $this->isEmployeeAdmin($employee)
-                && in_array(session('active_role'), ['admin', 'super_admin'], true),
+            'canAccessAdminMenu' => $this->isSuperAdminMode()
+                || ($this->isEmployeeAdmin($employee) && in_array(session('active_role'), ['admin', 'super_admin'], true)),
             'activeRole' => session('active_role', 'pegawai'),
             'canManageRoles' => $this->isSuperAdminMode(),
             'canManageRooms' => $this->isSuperAdminMode(),
@@ -348,6 +348,9 @@ class PortalController extends Controller
             'moda' => 'moda rapat',
             'peserta' => 'pegawai undangan',
         ]);
+        if ($data['selesai'] <= $data['mulai']) {
+            return back()->withErrors(['selesai' => 'Waktu selesai harus setelah waktu mulai.'])->withInput();
+        }
         if (!$request->boolean('semua_pegawai') && empty($data['peserta'])) {
             return back()->withErrors(['peserta' => 'Pilih rapat untuk semua pegawai atau centang minimal satu pegawai undangan.'])->withInput();
         }
@@ -610,6 +613,7 @@ class PortalController extends Controller
 
         switch ($action) {
             case 'tambah_pegawai':
+                abort_unless($this->isSuperAdminMode(), 403);
                 $data = $request->validate([
                     'nama' => ['required', 'string', 'max:150'],
                     'nip' => ['required', 'regex:/^\d{18}$/', 'unique:pegawai,nip'],
@@ -624,6 +628,7 @@ class PortalController extends Controller
                 return redirect()->route('admin', 'pegawai')->with('status', 'Pegawai berhasil ditambahkan. Kata sandi awal menggunakan NIP dan wajib diganti saat login pertama.');
 
             case 'atur_password_pegawai':
+                abort_unless($this->isSuperAdminMode(), 403);
                 $data = $request->validate(['password_pegawai' => ['required', 'string', 'min:8']]);
                 $employee = DB::table('pegawai')->where('id', $id)->first();
                 abort_unless($employee !== null, 404);
@@ -636,6 +641,7 @@ class PortalController extends Controller
                 ]);
 
             case 'ubah_jabatan':
+                abort_unless($this->isSuperAdminMode(), 403);
                 $data = $request->validate(['jabatan' => ['required', 'string', 'max:150']]);
                 abort_unless(DB::table('pegawai')->where('id', $id)->exists(), 404);
                 DB::table('pegawai')->where('id', $id)->update(['jabatan' => trim($data['jabatan'])]);
@@ -785,7 +791,7 @@ class PortalController extends Controller
                 abort_unless($this->isAdminMode(), 403);
                 $meeting = DB::table('rapat')->where('id', $id)->first();
                 abort_unless($meeting !== null, 404);
-                abort_unless(MeetingData::scheduleStatus($meeting) === 'berlangsung', 409, 'Rapat tidak sedang berlangsung.');
+                abort_unless(MeetingData::canManuallyEnd($meeting), 409, 'Rapat belum dimulai atau sudah diselesaikan.');
                 $checkoutCode = MeetingData::code();
                 while ($checkoutCode === $meeting->kode_presensi) {
                     $checkoutCode = MeetingData::code();
@@ -851,6 +857,19 @@ class PortalController extends Controller
         $isSuperAdmin = $this->isSuperAdminMode();
         $permissions = $this->superAdminPermissions($employee);
         abort_unless($isSuperAdmin || $permissions['buat_rapat'], 403);
+        $canEditMinutes = $isSuperAdmin || $permissions['notulen'];
+        $canManageMaterials = $isSuperAdmin || $permissions['materi'];
+        $canManageRecordings = $isSuperAdmin || $permissions['rekaman'];
+        abort_unless($canEditMinutes || (
+            !$request->has('notulen')
+            && !$request->hasFile('file_notulen')
+            && !$request->boolean('hapus_file_notulen')
+        ), 403);
+        abort_unless($canManageMaterials || (
+            !$request->hasFile('materi_rapat')
+            && !$request->boolean('hapus_materi_rapat')
+        ), 403);
+        abort_unless($canManageRecordings || !$request->has('link_rekaman'), 403);
 
         $data = $request->validate([
             'judul' => ['required', 'string', 'max:200'],
@@ -865,7 +884,7 @@ class PortalController extends Controller
             'notulis' => ['nullable', 'string', 'max:200'],
             'pemateri' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string'],
-            'link_rekaman' => ['nullable', 'url', 'starts_with:https://'],
+            'link_rekaman' => ['nullable', 'url', 'regex:#^https://(drive|docs)\.google\.com/|^https://(www\.)?youtube\.com/|^https://youtu\.be/#i'],
             'notulen' => ['nullable', 'string'],
             'file_notulen' => ['nullable', 'file', 'mimes:pdf', 'max:15360'],
             'materi_rapat' => ['nullable', 'file', 'mimes:pdf,ppt,pptx,doc,docx,zip', 'max:20480'],
@@ -890,22 +909,37 @@ class PortalController extends Controller
             'moda' => 'moda rapat',
             'peserta' => 'pegawai undangan',
         ]);
+        if ($data['selesai'] <= $data['mulai']) {
+            return back()->withErrors(['selesai' => 'Waktu selesai harus setelah waktu mulai.'])->withInput();
+        }
         if (!$request->boolean('semua_pegawai') && empty($data['peserta'])) {
             return back()->withErrors(['peserta' => 'Pilih rapat untuk semua pegawai atau centang minimal satu pegawai undangan.'])->withInput();
         }
         $old = $id ? DB::table('rapat')->where('id', $id)->first() : null;
         abort_if($id && !$old, 404);
         $room = !empty($data['room_id']) ? DB::table('ruang_rapat')->where('id', $data['room_id'])->first() : null;
+        if ($room && !$room->aktif && (int) ($old->room_id ?? 0) !== (int) $room->id) {
+            return back()->withErrors(['room_id' => 'Ruang nonaktif hanya dapat dipertahankan pada rapat yang sudah menggunakannya.'])->withInput();
+        }
         $values = [
             'judul' => $data['judul'], 'tanggal' => $data['tanggal'], 'mulai' => $data['mulai'],
             'selesai' => $data['selesai'], 'tempat' => $room->nama ?? ($data['tempat'] ?? ''),
             'room_id' => $room->id ?? null, 'link_meeting' => $data['link_meeting'] ?? null,
             'moda' => $data['moda'], 'pimpinan' => $data['pimpinan'] ?? '',
             'notulis' => $data['notulis'] ?? '', 'pemateri' => $data['pemateri'] ?? '',
-            'agenda' => $data['agenda'] ?? '', 'link_rekaman' => $data['link_rekaman'] ?? null,
-            'notulen' => $data['notulen'] ?? '',
+            'agenda' => $data['agenda'] ?? '',
+            'link_rekaman' => $canManageRecordings ? ($data['link_rekaman'] ?? null) : ($old->link_rekaman ?? null),
+            'notulen' => $canEditMinutes ? ($data['notulen'] ?? '') : ($old->notulen ?? ''),
         ];
-        foreach (['file_notulen' => 'file_notulen', 'materi_rapat' => 'materi_rapat'] as $input => $column) {
+        foreach ([
+            'file_notulen' => ['column' => 'file_notulen', 'allowed' => $canEditMinutes],
+            'materi_rapat' => ['column' => 'materi_rapat', 'allowed' => $canManageMaterials],
+        ] as $input => $filePermission) {
+            $column = $filePermission['column'];
+            if (!$filePermission['allowed']) {
+                $values[$column] = $old->$column ?? null;
+                continue;
+            }
             if ($request->hasFile($input)) {
                 if ($old?->$column) {
                     Storage::disk('meeting_uploads')->delete($old->$column);
@@ -1007,16 +1041,20 @@ class PortalController extends Controller
         $record = DB::table('rapat')->where('id', $meeting)->first();
         abort_unless($record !== null, 404);
         $admin = $this->isAdminMode();
-        $attendanceOnly = $employee && !$admin && MeetingData::scheduleStatus($record) === 'berlangsung';
         $attendance = $employee
             ? DB::table('kehadiran')->where('rapat_id', $meeting)->where('pegawai_id', $employee->id)->first()
             : null;
         $permissions = $this->superAdminPermissions($employee ?: null);
         $isSuperAdmin = $this->isSuperAdminMode();
-        $canEditMinutes = $isSuperAdmin || $permissions['notulen'];
-        $canManageMaterials = $isSuperAdmin || $permissions['materi'];
-        $canManageRecordings = $isSuperAdmin || $permissions['rekaman'];
-        $canViewAttendance = $isSuperAdmin || $permissions['lihat_daftar_hadir'];
+        $employeeSuperAdmin = (bool) ($employee && $isSuperAdmin);
+        $showMeetingAdminTools = $admin && !$employee;
+        $canManageMeetingContent = $admin;
+        $canEditMinutes = $canManageMeetingContent && ($isSuperAdmin || $permissions['notulen']);
+        $canManageMaterials = $canManageMeetingContent && ($isSuperAdmin || $permissions['materi']);
+        $canManageRecordings = $canManageMeetingContent && ($isSuperAdmin || $permissions['rekaman']);
+        $canViewAttendance = !$employee && ($isSuperAdmin || $permissions['lihat_daftar_hadir']);
+        $employeeAttendanceOnly = $employee
+            && MeetingData::scheduleStatus($record) === 'berlangsung';
         $attendees = DB::table('kehadiran as k')->join('pegawai as p', 'p.id', '=', 'k.pegawai_id')
             ->where('k.rapat_id', $meeting)->where('k.status', 'hadir')
             ->select('p.nama', 'p.nip', 'k.waktu', 'k.waktu_pulang', 'k.alasan_pulang')->orderBy('k.waktu')->get();
@@ -1026,12 +1064,18 @@ class PortalController extends Controller
             'employee' => $employee ?: null,
             'isAdmin' => $admin,
             'isSuperAdmin' => $isSuperAdmin,
-            'attendanceOnly' => $attendanceOnly,
+            'employeeSuperAdmin' => $employeeSuperAdmin,
+            'showMeetingAdminTools' => $showMeetingAdminTools,
+            'employeeAttendanceOnly' => $employeeAttendanceOnly,
             'attendance' => $attendance,
             'canEditMinutes' => $canEditMinutes,
             'canManageMaterials' => $canManageMaterials,
             'canManageRecordings' => $canManageRecordings,
             'canViewAttendance' => $canViewAttendance,
+            'canAccessAdminMenu' => $isSuperAdmin
+                || ($this->isEmployeeAdmin($employee) && in_array(session('active_role'), ['admin', 'super_admin'], true)),
+            'canManageRoles' => $isSuperAdmin,
+            'canManageRooms' => $isSuperAdmin,
             'attendees' => $attendees,
             'materials' => DB::table('berkas_rapat')->where('rapat_id', $meeting)->where('kategori', 'materi')->orderBy('dibuat_pada')->get(),
             'recordings' => DB::table('berkas_rapat')->where('rapat_id', $meeting)->where('kategori', 'rekaman')->orderBy('dibuat_pada')->get(),
@@ -1052,10 +1096,10 @@ class PortalController extends Controller
         abort_unless($record !== null, 404);
         $admin = $this->isAdminMode();
         $isSuperAdmin = $this->isSuperAdminMode();
-        $attendanceOnly = $employee && !$admin && MeetingData::scheduleStatus($record) === 'berlangsung';
+        $attendanceOnly = $employee && MeetingData::scheduleStatus($record) === 'berlangsung';
         $action = $request->string('aksi')->toString();
         $permissions = $this->superAdminPermissions($employee ?: null);
-        $allowedActionsDuringMeeting = ['hadir'];
+        $allowedActionsDuringMeeting = ['hadir', 'absen_pulang'];
         if ($isSuperAdmin || $permissions['notulen']) {
             $allowedActionsDuringMeeting[] = 'simpan_notulen';
         }
@@ -1098,15 +1142,20 @@ class PortalController extends Controller
             abort_unless($admin, 403);
             abort_unless(MeetingData::canManuallyEnd($record), 409, 'Rapat belum dimulai atau sudah diselesaikan.');
 
-            $checkoutCode = MeetingData::code();
-            while ($checkoutCode === $record->kode_presensi) {
+            $checkoutCode = $record->kode_presensi_pulang;
+            $checkoutExpires = $record->presensi_pulang_kedaluwarsa;
+            if (!MeetingData::checkoutOpen($record)) {
                 $checkoutCode = MeetingData::code();
+                while ($checkoutCode === $record->kode_presensi) {
+                    $checkoutCode = MeetingData::code();
+                }
+                $checkoutExpires = now()->addMinutes(30);
             }
             $endedAt = now();
             $updated = DB::table('rapat')->where('id', $meeting)->whereNull('ended_at')->update([
                 'ended_at' => $endedAt,
                 'kode_presensi_pulang' => $checkoutCode,
-                'presensi_pulang_kedaluwarsa' => $endedAt->copy()->addMinutes(30),
+                'presensi_pulang_kedaluwarsa' => $checkoutExpires,
             ]);
             abort_unless($updated === 1, 409, 'Rapat sudah diselesaikan.');
 
@@ -1119,8 +1168,7 @@ class PortalController extends Controller
                 $employee
                     && $attendance
                     && $attendance->status === 'hadir'
-                    && !$attendance->waktu_pulang
-                    && MeetingData::scheduleStatus($record) === 'selesai',
+                    && !$attendance->waktu_pulang,
                 403
             );
             $data = $request->validate(['kode' => ['required', 'string', 'max:20']]);
