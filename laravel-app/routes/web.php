@@ -18,8 +18,6 @@ Route::get('/meetings/{meeting}', [PortalController::class, 'meeting'])->middlew
 Route::post('/meetings/{meeting}/actions', [PortalController::class, 'meetingAction'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.action');
 
 Route::get('/admin/login', fn () => redirect()->route('login'))->name('admin.login');
-Route::post('/admin/login', [PortalController::class, 'adminLogin'])->name('admin.login.submit');
-Route::post('/admin/logout', [PortalController::class, 'adminLogout'])->name('admin.logout');
 Route::get('/live-board', [PortalController::class, 'liveBoard'])->name('live-board');
 Route::get('/live-board/data', [PortalController::class, 'liveBoardData'])->name('live-board.data');
 Route::get('/admin/{tab?}', [PortalController::class, 'admin'])->where('tab', 'ringkasan|rapat|ruang|kehadiran|pegawai|superadmin|pengaturan')->name('admin');

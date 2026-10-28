@@ -31,7 +31,7 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('Rapat berikutnya')
             ->assertSee('>Login</a>', false)
-            ->assertDontSee('NIP / Username')
+            ->assertDontSee('NIP')
             ->assertDontSee('login-identifier')
             ->assertDontSee('Cari nama atau NIP')
             ->assertSee('Live Board Rapat')
@@ -52,14 +52,14 @@ class PortalTest extends TestCase
     {
         $this->get('/login')
             ->assertOk()
-            ->assertSee('NIP / Username')
+            ->assertSee('>NIP</label>', false)
             ->assertSee('Kata sandi')
             ->assertSee('name="identifier"', false)
             ->assertSee('name="password"', false);
 
         $this->get('/')
             ->assertOk()
-            ->assertDontSee('NIP / Username')
+            ->assertDontSee('NIP')
             ->assertDontSee('login-identifier')
             ->assertSee('>Login</a>', false);
     }
@@ -693,55 +693,34 @@ class PortalTest extends TestCase
                 'password' => 'sandi-salah',
             ])
             ->assertRedirect('/')
-            ->assertSessionHasErrors(['login' => 'NIP/username atau kata sandi tidak sesuai.'])
+            ->assertSessionHasErrors(['login' => 'NIP atau kata sandi tidak sesuai.'])
             ->assertSessionHas('_old_input.identifier', '123456789012345678')
             ->assertSessionMissing('employee_id');
     }
 
-    public function test_admin_can_sign_in_using_the_seeded_account(): void
+    public function test_legacy_admin_username_cannot_sign_in(): void
     {
-        $this->post('/admin/login', ['username' => 'admin', 'password' => 'password'])
-            ->assertRedirect('/admin/rapat');
+        $this->assertDatabaseMissing('admin', ['username' => 'admin']);
 
-        $this->assertTrue(session()->has('admin_id'));
-        $this->get('/admin/pegawai')
-            ->assertOk()
-            ->assertSee('Cari pegawai')
-            ->assertDontSee('Live Board Rapat');
+        DB::table('admin')->insert([
+            'username' => 'admin',
+            'password_hash' => Hash::make('password'),
+        ]);
+        (require database_path('migrations/2026_10_28_000000_remove_legacy_admin_account.php'))->up();
+        $this->assertDatabaseMissing('admin', ['username' => 'admin']);
 
-        $this->get('/admin/rapat?edit=1')
-            ->assertOk()
-            ->assertSee('Jam Mulai')
-            ->assertSee('Jam Selesai')
-            ->assertSee('<label for="mulai-hour">Jam</label>', false)
-            ->assertSee('<label for="mulai-minute">Menit</label>', false)
-            ->assertSee('<label for="selesai-hour">Jam</label>', false)
-            ->assertSee('<label for="selesai-minute">Menit</label>', false)
-            ->assertSee('id="mulai-hour"', false)
-            ->assertSee('id="mulai-minute"', false)
-            ->assertSee('id="selesai-hour"', false)
-            ->assertSee('id="selesai-minute"', false)
-            ->assertSee('<option value="00" ', false)
-            ->assertSee('<option value="23" ', false)
-            ->assertSee('<option value="59" ', false)
-            ->assertSee('type="hidden" name="mulai" value="09:00"', false)
-            ->assertSee('type="hidden" name="selesai" value="11:00"', false)
-            ->assertSee('Pegawai yang wajib mengikuti')
-            ->assertSee('name="semua_pegawai"', false)
-            ->assertSee('Rapat untuk semua pegawai')
-            ->assertSee('Cari pegawai');
-        $this->get('/admin/superadmin')
-            ->assertOk()
-            ->assertSee('Hak Akses')
-            ->assertSee('Daftar Pengelola Rapat')
-            ->assertSee('Daftar Super Admin')
-            ->assertSee('Hak Akses Pengelola Rapat')
-            ->assertSee('name="buat_rapat"', false);
-        $this->get('/admin')
-            ->assertOk()
-            ->assertSee('Rapat')
-            ->assertDontSee('Ringkasan');
-        $this->get('/admin/ringkasan')->assertRedirect('/admin/rapat');
+        DB::table('admin')->insert([
+            'username' => 'admin',
+            'password_hash' => Hash::make('password'),
+        ]);
+
+        $this->from('/login')
+            ->post('/login', ['identifier' => 'admin', 'password' => 'password'])
+            ->assertRedirect('/login')
+            ->assertSessionHasErrors(['login' => 'NIP atau kata sandi tidak sesuai.'])
+            ->assertSessionMissing('admin_id');
+
+        $this->assertDatabaseHas('admin', ['username' => 'admin']);
     }
 
     public function test_admin_can_manage_employee_super_admin_role_and_job_title(): void

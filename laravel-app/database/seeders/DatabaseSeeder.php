@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -18,11 +17,5 @@ class DatabaseSeeder extends Seeder
             DB::table('pengaturan')->insertOrIgnore(['kunci' => $key, 'nilai' => $value]);
         }
 
-        if (!DB::table('admin')->exists()) {
-            DB::table('admin')->insert([
-                'username' => 'admin',
-                'password_hash' => Hash::make('password'),
-            ]);
-        }
     }
 }

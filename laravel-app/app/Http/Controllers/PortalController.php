@@ -176,7 +176,7 @@ class PortalController extends Controller
         if (preg_match('/^\d{18}$/', $data['identifier'])) {
             $employee = DB::table('pegawai')->where('nip', $data['identifier'])->first();
             if (!$employee || !$employee->password_hash || !password_verify($data['password'], $employee->password_hash)) {
-                return back()->withErrors(['login' => 'NIP/username atau kata sandi tidak sesuai.'])
+                return back()->withErrors(['login' => 'NIP atau kata sandi tidak sesuai.'])
                     ->onlyInput('identifier');
             }
 
@@ -198,17 +198,8 @@ class PortalController extends Controller
             return $this->redirectToDashboard();
         }
 
-        $admin = DB::table('admin')->where('username', trim($data['identifier']))->first();
-        if (!$admin || !password_verify($data['password'], $admin->password_hash)) {
-            return back()->withErrors(['login' => 'NIP/username atau kata sandi tidak sesuai.'])
-                ->onlyInput('identifier');
-        }
-
-        $request->session()->regenerate();
-        $request->session()->forget(['employee_id', 'employee_password_hash', 'active_role']);
-        $request->session()->put('admin_id', (int) $admin->id);
-
-        return redirect()->intended(route('admin', 'rapat'));
+        return back()->withErrors(['login' => 'NIP atau kata sandi tidak sesuai.'])
+            ->onlyInput('identifier');
     }
 
     public function loginForm()
@@ -226,12 +217,6 @@ class PortalController extends Controller
     public function employeeLogin(Request $request)
     {
         $request->merge(['identifier' => $request->input('nip')]);
-        return $this->login($request);
-    }
-
-    public function adminLogin(Request $request)
-    {
-        $request->merge(['identifier' => $request->input('username')]);
         return $this->login($request);
     }
 
@@ -292,16 +277,6 @@ class PortalController extends Controller
     public function employeeLogout(Request $request)
     {
         return $this->logout($request);
-    }
-
-    public function adminLogout(Request $request)
-    {
-        return $this->logout($request);
-    }
-
-    public function adminLoginForm()
-    {
-        return redirect()->route('login');
     }
 
     public function createMeeting(Request $request)
