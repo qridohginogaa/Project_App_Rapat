@@ -11,7 +11,7 @@ class RequireChangedEmployeePassword
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (!session()->has('admin_id') && session()->has('employee_id')) {
+        if (session()->has('employee_id')) {
             $employee = DB::table('pegawai')->where('id', session('employee_id'))->first();
 
             if ($employee && $employee->password_change_required) {

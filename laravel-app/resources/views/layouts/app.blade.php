@@ -14,10 +14,7 @@
             <h1>DASBOARD RAPAT &amp; KEGIATAN</h1>
             <p class="mu">Politeknik Kesehatan Kemenkes Manado</p>
         </div>
-        @if(session()->has('admin_id'))
-            <a class="btn" href="{{ route('admin') }}">Dashboard Super Admin</a>
-            <form method="post" action="{{ route('logout') }}">@csrf<button class="btn">Keluar</button></form>
-        @elseif(session()->has('employee_id'))
+        @if(session()->has('employee_id'))
             @if(isset($employee) && $employee)
                 <div class="employee-identity">
                     <b>{{ $employee->nama }}</b>

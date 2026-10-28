@@ -26,10 +26,6 @@ class PortalController extends Controller
 
     private function isAdminMode(): bool
     {
-        if (session()->has('admin_id')) {
-            return true;
-        }
-
         $employee = $this->employee();
         return $this->isSuperAdminMode()
             || (session('active_role') === 'admin' && $this->isEmployeeAdmin($employee));
@@ -37,11 +33,13 @@ class PortalController extends Controller
 
     private function isSuperAdminMode(): bool
     {
-        return session()->has('admin_id') || $this->isEmployeeSuperAdmin($this->employee());
+        return $this->isEmployeeSuperAdmin($this->employee());
     }
 
     private function employee(): ?object
     {
+        session()->forget('admin_id');
+
         $id = session('employee_id');
         $hash = session('employee_password_hash');
         if (!$id || !is_string($hash)) {
@@ -74,11 +72,6 @@ class PortalController extends Controller
             'lihat_daftar_hadir'=> false,
             'kelola_ruang'      => false,
         ];
-
-        // Login via halaman admin khusus (session admin_id) = Super Admin penuh
-        if (session()->has('admin_id')) {
-            return array_fill_keys(array_keys($permissions), true);
-        }
 
         if (!$employee || !$this->isEmployeeAdmin($employee)) {
             return $permissions;
@@ -207,10 +200,6 @@ class PortalController extends Controller
         if ($this->employee()) {
             return $this->redirectToDashboard();
         }
-        if (session()->has('admin_id')) {
-            return redirect()->route('admin', 'rapat');
-        }
-
         return view('login');
     }
 

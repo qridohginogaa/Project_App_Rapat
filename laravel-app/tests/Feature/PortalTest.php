@@ -11,10 +11,54 @@ class PortalTest extends TestCase
 {
     use RefreshDatabase;
 
+    private ?array $superAdminSession = null;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed();
+    }
+
+    public function withSession(array $data)
+    {
+        if (array_key_exists('admin_id', $data)) {
+            unset($data['admin_id']);
+            $data = array_merge($this->superAdminSession(), $data);
+        }
+
+        return parent::withSession($data);
+    }
+
+    private function withUntrustedSession(array $data)
+    {
+        return parent::withSession($data);
+    }
+
+    private function superAdminSession(): array
+    {
+        if ($this->superAdminSession !== null) {
+            return $this->superAdminSession;
+        }
+
+        $passwordHash = Hash::make('super-admin-password');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '999999999999999999',
+            'nama' => 'Super Admin Tes',
+            'jabatan' => 'Administrator',
+            'password_hash' => $passwordHash,
+        ]);
+        DB::table('admin_pegawai')->insert(['pegawai_id' => $employeeId]);
+        DB::table('super_admin_permissions')->insert([
+            'pegawai_id' => $employeeId,
+            'is_super_admin' => true,
+        ]);
+
+        return $this->superAdminSession = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+            'active_role' => 'super_admin',
+            'can_switch_role' => true,
+        ];
     }
 
     public function test_dashboard_shows_upcoming_meetings_to_visitors(): void
@@ -721,6 +765,38 @@ class PortalTest extends TestCase
             ->assertSessionMissing('admin_id');
 
         $this->assertDatabaseHas('admin', ['username' => 'admin']);
+    }
+
+    public function test_legacy_admin_session_cannot_access_super_admin_features(): void
+    {
+        $this->withUntrustedSession(['admin_id' => 1])
+            ->get('/admin/pegawai')
+            ->assertForbidden()
+            ->assertSessionMissing('admin_id');
+
+        $this->withUntrustedSession(['admin_id' => 1])
+            ->get('/login')
+            ->assertOk()
+            ->assertSee('Gunakan NIP pegawai untuk masuk.');
+    }
+
+    public function test_legacy_admin_session_cannot_bypass_required_password_change(): void
+    {
+        $passwordHash = Hash::make('kata-sandi-awal');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Wajib Ganti Sandi',
+            'jabatan' => 'Pegawai',
+            'password_hash' => $passwordHash,
+            'password_change_required' => true,
+        ]);
+
+        $this->withUntrustedSession([
+            'admin_id' => 1,
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+        ])->get('/meetings/1')
+            ->assertRedirect('/employee/password');
     }
 
     public function test_admin_can_manage_employee_super_admin_role_and_job_title(): void
