@@ -2,37 +2,55 @@
 
 @section('content')
 @php($scheduleStatus = \App\Support\MeetingData::scheduleStatus($meeting))
-<div class="flex items-center justify-between gap-3 flex-wrap">
-    <a href="{{ route('dashboard') }}">← Kembali ke dashboard</a>
-    @if($showMeetingAdminTools)<a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">🔑 Kelola presensi</a>@endif
-    @if($showMeetingAdminTools && \App\Support\MeetingData::canManuallyEnd($meeting))
-        <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">
-            @csrf<input type="hidden" name="aksi" value="selesaikan_rapat">
-            <button class="btn sm red">Selesaikan Rapat</button>
-        </form>
-    @endif
-</div>
-<h2 class="mt-2">{{ $meeting->judul }} <span class="tag {{ \App\Support\MeetingData::status($meeting) }}">{{ \App\Support\MeetingData::status($meeting) }}</span></h2>
-<p class="mu">{{ \App\Support\MeetingData::date($meeting->tanggal) }} · {{ substr($meeting->mulai, 0, 5) }}–{{ substr($meeting->selesai, 0, 5) }} WITA · {{ $meeting->tempat ?: 'Tempat belum ditentukan' }} ({{ $meeting->moda }})</p>
-@if($meeting->link_meeting)<p><a class="btn pri sm" href="{{ $meeting->link_meeting }}" target="_blank" rel="noopener">🔗 Buka tautan meeting</a></p>@endif
+<div class="meeting-detail-page">
+    <a class="meeting-detail-back" href="{{ route('dashboard') }}"><span class="meeting-detail-back-icon" aria-hidden="true">←</span><span>Kembali ke Dashboard</span></a>
+    <header class="meeting-detail-hero">
+        <div class="meeting-detail-hero-main">
+            <span class="meeting-detail-eyebrow">Informasi rapat</span>
+            <div class="meeting-detail-title-row">
+                <h2>{{ $meeting->judul }}</h2>
+                <span class="meeting-detail-status meeting-detail-status-{{ $scheduleStatus }}"><span></span>{{ $scheduleStatus === 'akan' ? 'Akan datang' : ucfirst($scheduleStatus) }}</span>
+            </div>
+            <div class="meeting-detail-meta">
+                <span><b aria-hidden="true">▣</b>{{ \App\Support\MeetingData::date($meeting->tanggal) }}</span>
+                <span><b aria-hidden="true">◷</b>{{ substr($meeting->mulai, 0, 5) }}–{{ substr($meeting->selesai, 0, 5) }} WITA</span>
+                <span><b aria-hidden="true">⌖</b>{{ $meeting->tempat ?: 'Tempat belum ditentukan' }}</span>
+                <span><b aria-hidden="true">◇</b>{{ $meeting->moda }}</span>
+            </div>
+        </div>
+        @if($showMeetingAdminTools || $meeting->link_meeting)
+            <div class="meeting-detail-hero-actions">
+                @if($meeting->link_meeting)<a class="btn pri sm" href="{{ $meeting->link_meeting }}" target="_blank" rel="noopener">Buka tautan meeting <span aria-hidden="true">↗</span></a>@endif
+                @if($showMeetingAdminTools)<a class="btn sm meeting-detail-manage" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">Kelola presensi</a>@endif
+                @if($showMeetingAdminTools && \App\Support\MeetingData::canManuallyEnd($meeting))
+                    <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">
+                        @csrf<input type="hidden" name="aksi" value="selesaikan_rapat">
+                        <button class="btn sm red">Selesaikan rapat</button>
+                    </form>
+                @endif
+            </div>
+        @endif
+    </header>
 
-<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-3">
-    <div class="box"><p class="mu">Pimpinan rapat</p>{{ $meeting->pimpinan }}</div>
-    <div class="box"><p class="mu">Notulis</p>{{ $meeting->notulis }}</div>
-    @if($meeting->pemateri)<div class="box"><p class="mu">Pemateri</p>{{ $meeting->pemateri }}</div>@endif
-</div>
-<div class="box mt-3"><p class="mu">Agenda</p><div style="white-space:pre-line">{{ $meeting->agenda }}</div></div>
-<div class="box mt-3">
-    <p class="mu">Pegawai yang wajib mengikuti</p>
+    <section class="meeting-detail-info-grid">
+        <article class="box meeting-detail-info-card"><span class="meeting-detail-info-icon" aria-hidden="true">♙</span><div><p class="mu">Pimpinan rapat</p><b>{{ $meeting->pimpinan ?: 'Belum ditentukan' }}</b></div></article>
+        <article class="box meeting-detail-info-card"><span class="meeting-detail-info-icon" aria-hidden="true">✎</span><div><p class="mu">Notulis</p><b>{{ $meeting->notulis ?: 'Belum ditentukan' }}</b></div></article>
+        @if($meeting->pemateri)<article class="box meeting-detail-info-card"><span class="meeting-detail-info-icon" aria-hidden="true">✦</span><div><p class="mu">Pemateri</p><b>{{ $meeting->pemateri }}</b></div></article>@endif
+    </section>
+    <section class="box meeting-detail-section">
+        <div class="meeting-detail-section-heading"><span aria-hidden="true">☷</span><div><h3>Agenda rapat</h3><p>Pokok pembahasan dan rencana kegiatan.</p></div></div>
+        <div class="meeting-detail-agenda">{{ $meeting->agenda ?: 'Agenda belum ditambahkan.' }}</div>
+    </section>
+    <section class="box meeting-detail-section">
+        <div class="meeting-detail-section-heading"><span aria-hidden="true">♧</span><div><h3>Peserta rapat</h3><p>Pegawai yang wajib mengikuti rapat ini.</p></div><b class="meeting-detail-section-count">{{ $meetingParticipants->isEmpty() ? 'Semua pegawai' : $meetingParticipants->count().' pegawai' }}</b></div>
     @if($meetingParticipants->isEmpty())
-        <p class="mu">Rapat ini untuk semua pegawai.</p>
+        <p class="meeting-detail-all-employees">Rapat ini terbuka untuk semua pegawai.</p>
     @else
-        <p>{{ $meetingParticipants->count() }} pegawai diundang</p>
-        <div class="flex flex-wrap gap-2">
-            @foreach($meetingParticipants as $person)<span class="tag">{{ $person->nama }}</span>@endforeach
+        <div class="meeting-detail-participants">
+            @foreach($meetingParticipants as $person)<span>{{ $person->nama }}</span>@endforeach
         </div>
     @endif
-</div>
+    </section>
 
 @if($employeeAttendanceOnly)
     <h2>Presensi rapat</h2>
@@ -220,8 +238,9 @@
 
 @endif
 
-<h2>Materi presentasi</h2>
-    <div class="box">
+<section class="meeting-detail-section">
+    <div class="meeting-detail-section-heading"><span aria-hidden="true">▤</span><div><h3>Materi presentasi</h3><p>Dokumen dan bahan pendukung rapat.</p></div></div>
+    <div class="box meeting-detail-content-box">
         @if($meeting->materi_rapat)<p><a href="{{ route('files.show', ['filename' => $meeting->materi_rapat, 'download' => 1]) }}">⬇ Materi rapat</a></p>@endif
         @if($materials->isNotEmpty())
             <div class="tw"><table><thead><tr><th>Materi</th><th>Ditambahkan oleh</th><th>Waktu</th></tr></thead><tbody>
@@ -235,9 +254,11 @@
             </form>
         @endif
     </div>
+</section>
 
-    <h2>Hasil rekaman</h2>
-    <div class="box">
+<section class="meeting-detail-section">
+    <div class="meeting-detail-section-heading"><span aria-hidden="true">▶</span><div><h3>Hasil rekaman</h3><p>Tautan dan file rekaman rapat.</p></div></div>
+    <div class="box meeting-detail-content-box">
         @if($meeting->link_rekaman)<p><a href="{{ $meeting->link_rekaman }}" target="_blank" rel="noopener">▶ Rekaman rapat</a></p>@endif
         @if($recordings->isNotEmpty())
             <div class="tw"><table><thead><tr><th>Rekaman</th><th>Ditambahkan oleh</th><th>Waktu</th></tr></thead><tbody>
@@ -252,12 +273,14 @@
             </form>
         @endif
     </div>
+</section>
 
-    <h2>Notulen rapat</h2>
-    @if($meeting->notulen)<div class="box" style="white-space:pre-line">{{ $meeting->notulen }}</div>@endif
-    @if($meeting->file_notulen)<p><a class="btn sm" href="{{ route('files.show', ['filename' => $meeting->file_notulen, 'download' => 1]) }}">📄 Unduh PDF notulen</a></p>@endif
+<section class="meeting-detail-section">
+    <div class="meeting-detail-section-heading"><span aria-hidden="true">▧</span><div><h3>Notulen rapat</h3><p>Catatan hasil pembahasan rapat.</p></div></div>
+    @if($meeting->notulen)<div class="box meeting-detail-content-box meeting-detail-agenda">{{ $meeting->notulen }}</div>@endif
+    @if($meeting->file_notulen)<p><a class="btn sm meeting-detail-download" href="{{ route('files.show', ['filename' => $meeting->file_notulen, 'download' => 1]) }}">Unduh PDF notulen</a></p>@endif
     @if($canEditMinutes)
-        <details class="box mt-3" @if(!$meeting->notulen && !$meeting->file_notulen) open @endif>
+        <details class="box meeting-detail-content-box meeting-detail-minutes-editor" @if(!$meeting->notulen && !$meeting->file_notulen) open @endif>
             <summary><b>Isi / tambah / ubah notulen</b></summary>
             <form method="post" action="{{ route('meetings.action', $meeting->id) }}" enctype="multipart/form-data" class="mt-3">@csrf<input type="hidden" name="aksi" value="simpan_notulen">
                 <textarea id="minutes" name="notulen" rows="10">{{ $meeting->notulen }}</textarea>
@@ -268,4 +291,9 @@
             </form>
         </details>
     @endif
+    @if(!$meeting->notulen && !$meeting->file_notulen && !$canEditMinutes)
+        <div class="meeting-detail-empty">Notulen belum tersedia.</div>
+    @endif
+</section>
+</div>
 @endsection

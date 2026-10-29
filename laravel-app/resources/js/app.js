@@ -1,5 +1,64 @@
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+document.querySelectorAll('[data-upcoming-slider]').forEach((slider) => {
+    const track = slider.querySelector('[data-slider-track]');
+    const slides = Array.from(slider.querySelectorAll('[data-upcoming-slide]'));
+    const dots = Array.from(slider.querySelectorAll('[data-slider-dot]'));
+    const previous = slider.querySelector('[data-slider-prev]');
+    const next = slider.querySelector('[data-slider-next]');
+    if (!track || slides.length < 2) return;
+
+    let activeIndex = 0;
+    let timer;
+
+    const showSlide = (index) => {
+        activeIndex = (index + slides.length) % slides.length;
+        track.style.transform = `translateX(-${activeIndex * 100}%)`;
+        slides.forEach((slide, slideIndex) => {
+            const isActive = slideIndex === activeIndex;
+            slide.setAttribute('aria-hidden', String(!isActive));
+            slide.inert = !isActive;
+        });
+        dots.forEach((dot, dotIndex) => {
+            dot.setAttribute('aria-pressed', String(dotIndex === activeIndex));
+        });
+    };
+
+    const stopAutoplay = () => window.clearInterval(timer);
+    const startAutoplay = () => {
+        stopAutoplay();
+        if (!reducedMotion && !document.hidden && !slider.matches(':hover') && !slider.contains(document.activeElement)) {
+            timer = window.setInterval(() => showSlide(activeIndex + 1), 6000);
+        }
+    };
+
+    previous?.addEventListener('click', () => {
+        showSlide(activeIndex - 1);
+        startAutoplay();
+    });
+    next?.addEventListener('click', () => {
+        showSlide(activeIndex + 1);
+        startAutoplay();
+    });
+    dots.forEach((dot) => {
+        dot.addEventListener('click', () => {
+            showSlide(Number(dot.dataset.sliderDot));
+            startAutoplay();
+        });
+    });
+
+    slider.addEventListener('mouseenter', stopAutoplay);
+    slider.addEventListener('mouseleave', startAutoplay);
+    slider.addEventListener('focusin', stopAutoplay);
+    slider.addEventListener('focusout', (event) => {
+        if (!slider.contains(event.relatedTarget)) startAutoplay();
+    });
+    document.addEventListener('visibilitychange', startAutoplay);
+
+    showSlide(0);
+    startAutoplay();
+});
+
 if (!reducedMotion && 'IntersectionObserver' in window) {
     const observer = new IntersectionObserver((entries, currentObserver) => {
         entries.forEach((entry) => {
@@ -9,7 +68,7 @@ if (!reducedMotion && 'IntersectionObserver' in window) {
         threshold: 0.12,
     });
 
-    document.querySelectorAll('main.wrap > section, main.wrap > .grid > .stat, main.wrap a.mt').forEach((element) => {
+    document.querySelectorAll('main.wrap > section, main.wrap > .grid > .stat, main.wrap > .mt, .completed-meetings-grid > .mt').forEach((element) => {
         if (element.hidden || element.hasAttribute('hidden')) return;
 
         element.classList.add('reveal-on-scroll');

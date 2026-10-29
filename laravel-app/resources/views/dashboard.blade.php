@@ -1,8 +1,12 @@
 @extends('layouts.app', ['title' => 'Dashboard Rapat'])
 
 @section('content')
-<h2 class="mt-0">Jadwal rapat</h2>
-<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+<section class="dashboard-hero">
+    <p>Poltekkes Kemenkes Manado</p>
+    <h2>Jadwal rapat</h2>
+    <span>Pantau rapat yang akan datang dan sedang berlangsung.</span>
+</section>
+<div class="dashboard-stats grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
     @foreach(['akan' => 'Akan datang', 'berlangsung' => 'Sedang berlangsung'] as $key => $label)
         <div class="stat"><b>{{ $meetingsByStatus[$key]->count() }}</b><span>{{ $label }}</span></div>
     @endforeach
@@ -15,12 +19,20 @@
     'selesai' => ['Rapat selesai', 'Belum ada rapat yang selesai.'],
 ] as $key => [$heading, $empty])
     @if($canSeeMeetings || $key !== 'selesai')
-        <section class="mt-5">
-            <h2>{{ $heading }} <span class="tag {{ $key === 'berlangsung' ? 'hadir' : ($key === 'akan' ? 'akan' : 'selesai') }}">{{ $meetingsByStatus[$key]->count() }}</span></h2>
+        <section class="dashboard-section mt-5">
+            <div class="dashboard-section-heading">
+                <h2>{{ $heading }}</h2>
+                <span class="tag {{ $key === 'berlangsung' ? 'hadir' : ($key === 'akan' ? 'akan' : 'selesai') }}">{{ $meetingsByStatus[$key]->count() }}</span>
+            </div>
             @if($key === 'selesai' && $meetingsByStatus[$key]->isNotEmpty())
-                <label for="completed-meeting-search">Cari rapat selesai</label>
-                <input id="completed-meeting-search" type="search" class="mb-3" placeholder="Cari judul, tanggal, atau tempat rapat..." data-completed-search>
+                <input id="completed-meeting-search" type="search" class="dashboard-search mb-3" aria-label="Cari rapat selesai" placeholder="Cari rapat selesai..." data-completed-search>
                 <p class="mu" data-completed-search-empty hidden>Tidak ada rapat selesai yang cocok dengan pencarian.</p>
+            @endif
+            @if($key === 'akan')
+                <div class="upcoming-slider" data-upcoming-slider aria-label="Rapat yang akan datang">
+                    <div class="upcoming-slider-track" data-slider-track aria-live="off">
+            @elseif($key === 'selesai')
+                <div class="completed-meetings-grid">
             @endif
             @forelse($meetingsByStatus[$key] as $meeting)
                 @php($scheduleStatus = \App\Support\MeetingData::scheduleStatus($meeting))
@@ -29,7 +41,7 @@
                     @php($meetingRoomName = mb_strtolower(trim(preg_replace('/\s+room$/i', '', $meeting->tempat))))
                     @php($previewRoom = $rooms->first(fn ($room) => mb_strtolower(trim(preg_replace('/\s+room$/i', '', $room->nama))) === $meetingRoomName))
                 @endif
-                <div class="mt {{ $scheduleStatus === 'berlangsung' ? 'hari' : $scheduleStatus }}{{ $key === 'selesai' && $loop->iteration > 3 ? ' hidden' : '' }}" @if($key === 'selesai')data-completed-meeting @if($loop->iteration > 3)hidden @endif @endif>
+                <div class="mt {{ $scheduleStatus === 'berlangsung' ? 'hari' : $scheduleStatus }}{{ $key === 'akan' ? ' upcoming-slide' : '' }}{{ $key === 'selesai' ? ' completed-meeting-card' : '' }}{{ $key === 'selesai' && $loop->iteration > 3 ? ' hidden' : '' }}" @if($key === 'akan')data-upcoming-slide @endif @if($key === 'selesai')data-completed-meeting @if($loop->iteration > 3)hidden @endif @endif>
                     <a class="meeting-card-main {{ $canSeeMeetings ? '' : 'mt-static' }}" @if($canSeeMeetings) href="{{ route('meetings.show', $meeting->id) }}" @endif>
                         <div class="jam">{{ substr($meeting->mulai, 0, 5) }}<small>{{ substr($meeting->selesai, 0, 5) }}</small></div>
                         <div class="grow">
@@ -51,8 +63,25 @@
                     @endif
                 </div>
             @empty
-                <p class="mu">{{ $empty }}</p>
+                <p class="dashboard-empty">{{ $empty }}</p>
             @endforelse
+            @if($key === 'akan')
+                    </div>
+                    @if($meetingsByStatus[$key]->count() > 1)
+                        <div class="upcoming-slider-controls">
+                            <button class="btn sm" type="button" data-slider-prev aria-label="Rapat sebelumnya">‹</button>
+                            <div class="upcoming-slider-dots" aria-label="Pilih rapat">
+                                @foreach($meetingsByStatus[$key] as $index => $meeting)
+                                    <button type="button" data-slider-dot="{{ $index }}" aria-label="Tampilkan rapat {{ $index + 1 }}" aria-pressed="{{ $index === 0 ? 'true' : 'false' }}"></button>
+                                @endforeach
+                            </div>
+                            <button class="btn sm" type="button" data-slider-next aria-label="Rapat berikutnya">›</button>
+                        </div>
+                    @endif
+                </div>
+            @elseif($key === 'selesai')
+                </div>
+            @endif
             @if($key === 'selesai' && $meetingsByStatus[$key]->count() > 3)
                 <button class="btn mt-2" type="button" data-completed-toggle aria-expanded="false">
                     Tampilkan lainnya ({{ $meetingsByStatus[$key]->count() - 3 }})
@@ -61,45 +90,6 @@
         </section>
     @endif
 @endforeach
-
-@if($employee && $canCreateMeetings)
-    <section class="mt-6">
-        <h2>Tambah rapat</h2>
-        <details class="box">
-            <summary><b>Jadwalkan rapat / kegiatan baru</b></summary>
-            <p class="mu mt-2">Kode presensi tetap dikelola Pengelola Rapat.</p>
-            <form method="post" action="{{ route('meetings.create') }}" enctype="multipart/form-data">
-                @csrf
-                <label>Judul rapat / kegiatan</label><input name="judul" required value="{{ old('judul') }}">
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div><label>Tanggal</label><input type="date" name="tanggal" required value="{{ old('tanggal', now()->toDateString()) }}"></div>
-                    <div><label>Moda</label><select name="moda"><option>Luring</option><option>Daring</option><option>Hybrid</option></select></div>
-                    <div>@include('partials.meeting-time-select', ['name' => 'mulai', 'label' => 'Mulai', 'selectedTime' => old('mulai', '09:00')])</div>
-                    <div>@include('partials.meeting-time-select', ['name' => 'selesai', 'label' => 'Selesai', 'selectedTime' => old('selesai', '11:00')])</div>
-                    <div><label>Ruang rapat</label><select name="room_id"><option value="">Tidak memilih ruang</option>@foreach($rooms as $room)<option value="{{ $room->id }}">{{ $room->nama }}</option>@endforeach</select></div>
-                    <div><label>Tautan meeting HTTPS (opsional)</label><input type="url" name="link_meeting"></div>
-                    <div><label>Pimpinan rapat (opsional)</label><input name="pimpinan" list="employees"></div>
-                    <div><label>Notulis (opsional)</label><input name="notulis" list="employees"></div>
-                </div>
-                <datalist id="employees">@foreach($employees as $person)<option value="{{ $person->nama }}">@endforeach</datalist>
-                @include('partials.meeting-participants', ['participantPrefix' => 'employee-meeting'])
-                <label>Pemateri (opsional)</label><input name="pemateri">
-                <label>Agenda (satu per baris)</label><textarea name="agenda" rows="3"></textarea>
-                @if($canEditMinutes)
-                    <label>Notulen (opsional)</label><textarea name="notulen" rows="4"></textarea>
-                    <label>Berkas notulen PDF (maks. 15 MB)</label><input type="file" name="file_notulen" accept=".pdf,application/pdf">
-                @endif
-                @if($canUploadMaterials)
-                    <label>Materi presentasi PDF/PPT/PPTX (maks. 20 MB)</label><input type="file" name="materi" accept=".pdf,.ppt,.pptx,.odp">
-                @endif
-                @if($canAddRecordings)
-                    <label>Tautan hasil rekaman Google Drive / YouTube (opsional)</label><input type="url" name="link_rekaman">
-                @endif
-                <button class="btn pri mt-3">Simpan rapat</button>
-            </form>
-        </details>
-    </section>
-@endif
 
 <script>
     (function () {
