@@ -1,0 +1,2 @@
+# Skrip dan konfigurasi ini dijalankan di Linux; CRLF membuat bash/nginx gagal.
+* text=auto eol=lf
