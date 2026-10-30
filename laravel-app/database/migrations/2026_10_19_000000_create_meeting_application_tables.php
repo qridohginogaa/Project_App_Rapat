@@ -8,9 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // ID memakai INT signed seperti database lama, sesuai kolom relasi pada migrasi berikutnya.
         if (!Schema::hasTable('pegawai')) {
             Schema::create('pegawai', function (Blueprint $table) {
-                $table->increments('id');
+                $table->integer('id', true);
                 $table->char('nip', 18)->unique();
                 $table->string('nama', 150);
                 $table->string('jabatan', 150);
@@ -20,7 +21,7 @@ return new class extends Migration
 
         if (!Schema::hasTable('ruang_rapat')) {
             Schema::create('ruang_rapat', function (Blueprint $table) {
-                $table->increments('id');
+                $table->integer('id', true);
                 $table->string('nama', 120)->unique();
                 $table->boolean('aktif')->default(true);
                 $table->timestamp('dibuat_pada')->useCurrent();
@@ -29,13 +30,13 @@ return new class extends Migration
 
         if (!Schema::hasTable('rapat')) {
             Schema::create('rapat', function (Blueprint $table) {
-                $table->increments('id');
+                $table->integer('id', true);
                 $table->string('judul', 200);
                 $table->date('tanggal');
                 $table->time('mulai');
                 $table->time('selesai');
                 $table->string('tempat', 200)->nullable();
-                $table->unsignedInteger('room_id')->nullable();
+                $table->integer('room_id')->nullable();
                 $table->string('link_meeting', 500)->nullable();
                 $table->enum('moda', ['Luring', 'Daring', 'Hybrid'])->default('Luring');
                 $table->string('pimpinan', 200)->nullable();
@@ -55,8 +56,8 @@ return new class extends Migration
 
         if (!Schema::hasTable('berkas_rapat')) {
             Schema::create('berkas_rapat', function (Blueprint $table) {
-                $table->increments('id');
-                $table->unsignedInteger('rapat_id');
+                $table->integer('id', true);
+                $table->integer('rapat_id');
                 $table->enum('kategori', ['materi', 'rekaman']);
                 $table->string('nama_file', 100)->nullable();
                 $table->string('nama_asli', 255)->nullable();
@@ -69,9 +70,9 @@ return new class extends Migration
 
         if (!Schema::hasTable('penugasan')) {
             Schema::create('penugasan', function (Blueprint $table) {
-                $table->increments('id');
-                $table->unsignedInteger('rapat_id');
-                $table->unsignedInteger('pegawai_id')->nullable();
+                $table->integer('id', true);
+                $table->integer('rapat_id');
+                $table->integer('pegawai_id')->nullable();
                 $table->string('nama_petugas', 150)->nullable();
                 $table->text('tugas');
                 $table->date('deadline')->nullable();
@@ -82,9 +83,9 @@ return new class extends Migration
 
         if (!Schema::hasTable('kehadiran')) {
             Schema::create('kehadiran', function (Blueprint $table) {
-                $table->increments('id');
-                $table->unsignedInteger('rapat_id');
-                $table->unsignedInteger('pegawai_id');
+                $table->integer('id', true);
+                $table->integer('rapat_id');
+                $table->integer('pegawai_id');
                 $table->enum('status', ['hadir', 'izin']);
                 $table->string('jenis', 30)->nullable();
                 $table->text('alasan')->nullable();
@@ -100,7 +101,7 @@ return new class extends Migration
 
         if (!Schema::hasTable('admin')) {
             Schema::create('admin', function (Blueprint $table) {
-                $table->increments('id');
+                $table->integer('id', true);
                 $table->string('username', 50)->unique();
                 $table->string('password_hash', 255);
             });

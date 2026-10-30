@@ -1,0 +1,57 @@
+name: rapat
+
+x-build: &build
+  context: /var/www/rapat
+  dockerfile: /opt/rapat-deploy/docker/Dockerfile
+
+services:
+  app:
+    build:
+      <<: *build
+      target: app
+    image: rapat-app:prod
+    env_file: .env
+    command: ["sh", "-c", "runuser -u www-data -- php artisan optimize && exec php-fpm"]
+    volumes:
+      - storage:/var/www/html/storage
+      - /var/www/rapat/uploads:/var/www/uploads
+      - ./php.ini:/usr/local/etc/php/conf.d/99-rapat.ini:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      <<: *build
+      target: web
+    image: rapat-web:prod
+    ports:
+      - "127.0.0.1:8100:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  storage:
+  dbdata:

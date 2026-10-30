@@ -1,0 +1,16 @@
+.git
+deploy
+uploads
+*.docx
+**/node_modules
+laravel-app/vendor
+laravel-app/.env
+laravel-app/.env.*
+!laravel-app/.env.example
+laravel-app/public/build
+laravel-app/public/hot
+laravel-app/bootstrap/cache/*.php
+laravel-app/storage/logs/*
+laravel-app/storage/framework/cache/data/*
+laravel-app/storage/framework/sessions/*
+laravel-app/storage/framework/views/*
