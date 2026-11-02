@@ -12,7 +12,6 @@
         <input id="login-password" name="password" type="password" required autocomplete="current-password">
         <div class="flex items-center gap-2 mt-3">
             <button class="btn pri">Login</button>
-            <a class="btn" href="{{ route('dashboard') }}">Kembali ke dashboard</a>
         </div>
     </form>
 </section>

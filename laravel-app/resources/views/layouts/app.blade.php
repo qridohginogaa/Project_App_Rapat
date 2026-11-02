@@ -9,9 +9,11 @@
 <body class="min-h-screen antialiased">
 <header class="top bg-white/95 shadow-sm backdrop-blur">
     <div class="wrap mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
-        <img src="{{ asset('assets/img/logo.png') }}" alt="Kemenkes Poltekkes Manado" class="logo">
+        <a class="logo-home-link" href="{{ route('dashboard') }}" aria-label="Kembali ke Dashboard" title="Kembali ke Dashboard">
+            <img src="{{ asset('assets/img/logo.png') }}" alt="Kemenkes Poltekkes Manado" class="logo">
+        </a>
         <div class="grow">
-            <h1>DASBOARD RAPAT &amp; KEGIATAN</h1>
+            <h1>DASHBOARD RAPAT</h1>
             <p class="mu">Politeknik Kesehatan Kemenkes Manado</p>
         </div>
         @if(session()->has('employee_id'))
@@ -28,6 +30,12 @@
                         @endif
                     </span>
                 </div>
+            @endif
+            @if(isset($employee) && $employee)
+                <a class="btn sm" href="{{ route('signatures.index') }}">
+                    Tanda tangan
+                    @if(($pendingSignatureCount ?? 0) > 0)<span class="signature-nav-count">{{ $pendingSignatureCount }}</span>@endif
+                </a>
             @endif
             <form method="post" action="{{ route('logout') }}">@csrf<button class="btn">Keluar</button></form>
         @else

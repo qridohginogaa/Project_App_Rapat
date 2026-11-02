@@ -1,5 +1,115 @@
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+document.querySelectorAll('[data-signer-picker]').forEach((picker) => {
+    const trigger = picker.querySelector('[data-signer-trigger]');
+    const menu = picker.querySelector('[data-signer-menu]');
+    const search = picker.querySelector('[data-signer-search]');
+    const value = picker.querySelector('[data-signer-value]');
+    const label = picker.querySelector('[data-signer-label]');
+    const options = Array.from(picker.querySelectorAll('[data-signer-option]'));
+    const empty = picker.querySelector('[data-signer-empty]');
+    let activeIndex = -1;
+
+    const visibleOptions = () => options.filter((option) => !option.hidden);
+    const setActiveOption = (index) => {
+        const visible = visibleOptions();
+        if (!visible.length) {
+            activeIndex = -1;
+            return;
+        }
+
+        activeIndex = (index + visible.length) % visible.length;
+        visible.forEach((option, optionIndex) => {
+            option.classList.toggle('is-active', optionIndex === activeIndex);
+        });
+        visible[activeIndex].scrollIntoView({ block: 'nearest' });
+    };
+
+    const close = (returnFocus = false) => {
+        menu.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        search.setAttribute('aria-expanded', 'false');
+        trigger.classList.remove('is-open');
+        activeIndex = -1;
+        options.forEach((option) => option.classList.remove('is-active'));
+        if (returnFocus) trigger.focus();
+    };
+
+    const open = () => {
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        search.setAttribute('aria-expanded', 'true');
+        trigger.classList.add('is-open');
+        search.focus();
+    };
+
+    const filter = () => {
+        const query = search.value.trim().toLocaleLowerCase();
+        let visibleCount = 0;
+        options.forEach((option) => {
+            const matches = option.dataset.searchText.toLocaleLowerCase().includes(query);
+            option.hidden = !matches;
+            option.setAttribute('aria-selected', String(option.dataset.value === value.value));
+            if (matches) visibleCount += 1;
+        });
+        empty.hidden = visibleCount > 0;
+        activeIndex = -1;
+        options.forEach((option) => option.classList.remove('is-active'));
+    };
+
+    const selectOption = (option) => {
+        value.value = option.dataset.value;
+        label.textContent = option.textContent.trim();
+        options.forEach((item) => {
+            item.setAttribute('aria-selected', String(item === option));
+        });
+        search.value = '';
+        filter();
+        close();
+        trigger.focus();
+    };
+
+    trigger.addEventListener('click', () => {
+        if (menu.hidden) open();
+        else close();
+    });
+
+    search.addEventListener('input', filter);
+    search.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setActiveOption(activeIndex + 1);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveOption(activeIndex < 0 ? visibleOptions().length - 1 : activeIndex - 1);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            const visible = visibleOptions();
+            const option = activeIndex >= 0 ? visible[activeIndex] : visible[0];
+            if (option) selectOption(option);
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            close(true);
+        } else if (event.key === 'Tab') {
+            close();
+        }
+    });
+
+    options.forEach((option) => {
+        option.addEventListener('click', () => selectOption(option));
+        option.addEventListener('mouseenter', () => {
+            const visible = visibleOptions();
+            setActiveOption(visible.indexOf(option));
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!picker.contains(event.target)) close();
+    });
+
+    filter();
+});
+
 document.querySelectorAll('[data-upcoming-slider]').forEach((slider) => {
     const track = slider.querySelector('[data-slider-track]');
     const slides = Array.from(slider.querySelectorAll('[data-upcoming-slide]'));
@@ -129,7 +239,18 @@ if (liveBoard) {
         const fragment = document.createDocumentFragment();
 
         if (meetings.length === 0) {
-            fragment.appendChild(element('p', 'live-board-empty', 'Tidak ada rapat yang sedang berlangsung.'));
+            const emptyState = element('section', 'live-board-empty');
+            emptyState.setAttribute('aria-label', 'Tidak ada rapat aktif');
+            const icon = element('span', 'live-board-empty-icon', '✓');
+            icon.setAttribute('aria-hidden', 'true');
+            const copy = element('div', 'live-board-empty-copy');
+            copy.append(
+                element('span', 'live-board-empty-kicker', 'SEMUA TERKINI'),
+                element('h2', '', 'Tidak ada rapat yang sedang berlangsung'),
+                element('p', '', 'Informasi rapat aktif akan muncul otomatis di sini saat rapat dimulai.')
+            );
+            emptyState.append(icon, copy);
+            fragment.appendChild(emptyState);
             meetingContainer.replaceChildren(fragment);
             return;
         }

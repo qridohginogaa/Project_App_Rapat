@@ -14,10 +14,30 @@ Route::get('/employee/password', [PortalController::class, 'employeePasswordForm
 Route::post('/employee/password', [PortalController::class, 'updateEmployeePassword'])->name('employee.password.update');
 Route::post('/employee/logout', [PortalController::class, 'employeeLogout'])->name('employee.logout');
 Route::post('/meetings', [PortalController::class, 'createMeeting'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.create');
+Route::get('/guest-attendance', [PortalController::class, 'guestAttendanceForm'])->name('guest-attendance');
+Route::post('/guest-attendance', [PortalController::class, 'registerGuestAttendance'])->middleware('throttle:60,1')->name('guest-attendance.store');
 Route::get('/meetings/{meeting}', [PortalController::class, 'meeting'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.show');
+Route::get('/meetings/{meeting}/minutes-attendance/export', [PortalController::class, 'exportMeetingReport'])
+    ->whereNumber('meeting')
+    ->name('meetings.report.export');
+Route::get('/signatures', [PortalController::class, 'signatureInbox'])
+    ->middleware(RequireChangedEmployeePassword::class)
+    ->name('signatures.index');
+Route::post('/meetings/{meeting}/signatures/{role}/accept', [PortalController::class, 'acceptMeetingSignature'])
+    ->middleware(RequireChangedEmployeePassword::class)
+    ->whereNumber('meeting')
+    ->whereIn('role', ['pimpinan', 'notulis'])
+    ->name('signatures.accept');
+Route::get('/signatures/verify/{token}', [PortalController::class, 'verifyMeetingSignature'])
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->name('signatures.verify');
 Route::post('/meetings/{meeting}/actions', [PortalController::class, 'meetingAction'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.action');
 
 Route::get('/admin/login', fn () => redirect()->route('login'))->name('admin.login');
+Route::get('/admin/attendance/{meeting}/{type}/export', [PortalController::class, 'exportAttendance'])
+    ->whereNumber('meeting')
+    ->whereIn('type', ['pegawai', 'tamu'])
+    ->name('admin.attendance.export');
 Route::get('/live-board', [PortalController::class, 'liveBoard'])->name('live-board');
 Route::get('/live-board/data', [PortalController::class, 'liveBoardData'])->name('live-board.data');
 Route::get('/admin/{tab?}', [PortalController::class, 'admin'])->where('tab', 'ringkasan|rapat|ruang|kehadiran|pegawai|superadmin|pengaturan')->name('admin');

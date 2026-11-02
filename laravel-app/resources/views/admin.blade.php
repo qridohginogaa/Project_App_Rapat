@@ -4,9 +4,6 @@
 @php
     $tabs = ['rapat' => 'Rapat', 'ruang' => 'Ruang Rapat', 'kehadiran' => 'Kehadiran & Izin', 'pegawai' => 'Pegawai', 'superadmin' => 'Hak Akses', 'pengaturan' => 'Pengaturan'];
 @endphp
-@if($canReturnToEmployeeDashboard || $isSuperAdmin)
-    <a class="btn admin-back-link mb-3" href="{{ route('dashboard') }}"><span aria-hidden="true">←</span> Kembali ke Dashboard</a>
-@endif
 <nav class="tabs admin-menu-panel flex flex-wrap gap-2 mb-4">
     @foreach($tabs as $key => $label)
         @php
@@ -239,7 +236,7 @@
     </div>
     <section class="attendance-section">
     <div class="attendance-section-heading">
-        <div><h2>Presensi rapat selesai</h2><p>Periksa kehadiran dan catatan absen pulang per rapat.</p></div>
+        <div><h2>Presensi rapat selesai</h2><p>Buka rapat, lalu pilih jenis presensi pegawai atau tamu/mahasiswa.</p></div>
         <div class="attendance-section-actions">
             <span class="tag selesai">{{ $completedMeetings->count() }} rapat</span>
             @if($completedMeetings->count() > 4)
@@ -254,7 +251,8 @@
     @forelse($completedMeetings as $completedMeeting)
         @php($completedAttendanceIndex++)
         @php($completedAttendees = $completedMeetingAttendees->get($completedMeeting->id, collect()))
-        @php($presentCount = $completedAttendees->count())
+        @php($guestAttendees = $completedMeetingGuestAttendees->get($completedMeeting->id, collect()))
+        @php($selectedAttendanceType = $completedAttendees->isEmpty() && $guestAttendees->isNotEmpty() ? 'tamu' : 'pegawai')
         <details class="{{ $completedAttendanceIndex > 4 ? 'attendance-meeting-card hidden' : 'attendance-meeting-card' }}" data-completed-attendance-meeting @if($completedAttendanceIndex > 4)hidden @endif>
             <summary>
                 <span class="attendance-meeting-icon" aria-hidden="true">▦</span>
@@ -262,23 +260,68 @@
                 <span class="attendance-meeting-title">{{ $completedMeeting->judul }}</span>
                 <span class="attendance-meeting-meta">{{ \App\Support\MeetingData::date($completedMeeting->tanggal) }}</span>
                 </span>
-                <span class="tag hadir">{{ $presentCount }} hadir</span>
+                <span class="attendance-meeting-counts">
+                    <span class="tag hadir">{{ $completedAttendees->count() }} pegawai</span>
+                    <span class="tag akan">{{ $guestAttendees->count() }} tamu/mahasiswa</span>
+                </span>
                 <span class="attendance-meeting-chevron" aria-hidden="true">⌄</span>
             </summary>
-            <div class="tw attendance-meeting-table"><table><thead><tr><th>Nama</th><th>NIP</th><th>Absen masuk</th><th>Absen pulang</th><th>Keterangan tidak absen pulang</th></tr></thead><tbody>
-                @forelse($completedAttendees as $person)
-                    <tr>
-                        <td>{{ $person->nama }}</td><td>{{ $person->nip }}</td>
-                        <td>{{ $person->waktu ? substr($person->waktu, 11, 5).' WITA' : '—' }}</td>
-                        <td>{{ $person->waktu_pulang ? substr($person->waktu_pulang, 11, 5).' WITA' : '—' }}</td>
-                        <td>
-                            @if($person->waktu_pulang)<span class="tag hadir">Sudah Absen Pulang</span>@else<span class="tag selesai">Belum Absen Pulang</span><br><small class="mu">Keterangan / alasan: {{ $person->alasan_pulang ?: 'Belum diisi pegawai (Alasan pulang duluan)' }}</small>@endif
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="5" class="mu">Belum ada catatan kehadiran atau izin.</td></tr>
-                @endforelse
-            </tbody></table></div>
+            <div class="attendance-meeting-content" data-attendance-meeting-content>
+                <label class="attendance-type-picker">
+                    <span>Lihat daftar presensi</span>
+                    <select aria-label="Pilih jenis presensi untuk {{ $completedMeeting->judul }}" data-attendance-type-select>
+                        <option value="pegawai" @selected($selectedAttendanceType === 'pegawai')>Pegawai ({{ $completedAttendees->count() }})</option>
+                        <option value="tamu" @selected($selectedAttendanceType === 'tamu')>Tamu / Mahasiswa ({{ $guestAttendees->count() }})</option>
+                    </select>
+                </label>
+                <div data-attendance-type="pegawai" @if($selectedAttendanceType !== 'pegawai') hidden @endif>
+                    <div class="attendance-export-action">
+                        <a class="btn sm" href="{{ route('admin.attendance.export', ['meeting' => $completedMeeting->id, 'type' => 'pegawai']) }}">Ekspor Excel pegawai</a>
+                    </div>
+                    <div class="tw attendance-meeting-table">
+                        <table><thead><tr><th>Nama</th><th>NIP</th><th>Absen masuk</th><th>Absen pulang</th><th>Keterangan tidak absen pulang</th></tr></thead><tbody>
+                            @forelse($completedAttendees as $person)
+                                <tr>
+                                    <td>{{ $person->nama }}</td><td>{{ $person->nip }}</td>
+                                    <td>{{ $person->waktu ? substr($person->waktu, 11, 5).' WITA' : '—' }}</td>
+                                    <td>{{ $person->waktu_pulang ? substr($person->waktu_pulang, 11, 5).' WITA' : '—' }}</td>
+                                    <td>
+                                        @if($person->waktu_pulang)<span class="tag hadir">Sudah Absen Pulang</span>@elseif($person->alasan_pulang)<span class="tag selesai">Pulang lebih awal</span><br><small class="mu">Alasan: {{ $person->alasan_pulang }}</small>@else<span class="tag selesai">Belum Absen Pulang</span><br><small class="mu">Alasan: Belum diisi pegawai.</small>@endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="5" class="mu">Belum ada pegawai yang tercatat hadir pada rapat ini.</td></tr>
+                            @endforelse
+                        </tbody></table>
+                    </div>
+                </div>
+                <div data-attendance-type="tamu" @if($selectedAttendanceType !== 'tamu') hidden @endif>
+                    <div class="attendance-export-action">
+                        <a class="btn sm" href="{{ route('admin.attendance.export', ['meeting' => $completedMeeting->id, 'type' => 'tamu']) }}">Ekspor Excel tamu/mahasiswa</a>
+                    </div>
+                    @if($guestAttendees->isNotEmpty())
+                        <div class="tw attendance-meeting-table attendance-guest-table">
+                            <table>
+                                <thead><tr><th>Nama</th><th>Jenis peserta</th><th>Instansi / program studi</th><th>NIM</th><th>Absen masuk</th><th>Absen pulang</th></tr></thead>
+                                <tbody>
+                                    @foreach($guestAttendees as $guest)
+                                        <tr>
+                                            <td>{{ $guest->nama }}</td>
+                                            <td>{{ ucfirst($guest->jenis) }}</td>
+                                            <td>{{ $guest->asal }}</td>
+                                            <td>{{ $guest->nim ?: '—' }}</td>
+                                            <td>{{ $guest->waktu ? substr($guest->waktu, 11, 5).' WITA' : '—' }}</td>
+                                            <td>{{ $guest->waktu_pulang ? substr($guest->waktu_pulang, 11, 5).' WITA' : 'Belum absen pulang' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <p class="attendance-empty">Belum ada presensi tamu atau mahasiswa pada rapat ini.</p>
+                    @endif
+                </div>
+            </div>
         </details>
     @empty
         <p class="attendance-empty">Belum ada rapat yang selesai.</p>
@@ -303,6 +346,21 @@
             })();
         </script>
     @endif
+    <script>
+        (function () {
+            document.querySelectorAll('[data-attendance-meeting-content]').forEach(function (content) {
+                var select = content.querySelector('[data-attendance-type-select]');
+                var panels = content.querySelectorAll('[data-attendance-type]');
+                if (!select) return;
+
+                select.addEventListener('change', function () {
+                    panels.forEach(function (panel) {
+                        panel.hidden = panel.dataset.attendanceType !== select.value;
+                    });
+                });
+            });
+        })();
+    </script>
     </section>
     <section class="attendance-section">
     <div class="attendance-section-heading">
@@ -470,22 +528,37 @@
                             <h3>Peserta dan petugas</h3>
                             <p class="mu">Tentukan pimpinan, notulis, pemateri, dan pegawai yang mengikuti rapat.</p>
                             <div class="meeting-form-grid">
-                                <div class="meeting-form-field"><label>Pimpinan</label><input name="pimpinan" value="{{ old('pimpinan', $meeting->pimpinan) }}"></div>
-                                <div class="meeting-form-field"><label>Notulis</label><input name="notulis" value="{{ old('notulis', $meeting->notulis) }}"></div>
+                                <div class="meeting-form-field">
+                                    <label for="meeting-chair-picker">Pimpinan rapat (akun untuk tanda tangan)</label>
+                                    @include('partials.signer-picker', [
+                                        'pickerId' => 'meeting-chair-picker',
+                                        'name' => 'pimpinan_pegawai_id',
+                                        'label' => 'pimpinan rapat',
+                                        'employeeId' => old('pimpinan_pegawai_id', $meeting->pimpinan_pegawai_id ?? ''),
+                                    ])
+                                    @if(!$meeting->id && $meeting->pimpinan)<small class="mu">Nama lama “{{ $meeting->pimpinan }}” belum terhubung ke akun.</small>@endif
+                                    @if($meeting->id && empty($meeting->pimpinan_pegawai_id) && $meeting->pimpinan)<small class="mu">Nama lama “{{ $meeting->pimpinan }}” belum terhubung ke akun. Pilih pegawai agar menerima permintaan tanda tangan.</small>@endif
+                                </div>
+                                <div class="meeting-form-field">
+                                    <label for="meeting-minute-taker-picker">Notulis (akun untuk tanda tangan)</label>
+                                    @include('partials.signer-picker', [
+                                        'pickerId' => 'meeting-minute-taker-picker',
+                                        'name' => 'notulis_pegawai_id',
+                                        'label' => 'notulis',
+                                        'employeeId' => old('notulis_pegawai_id', $meeting->notulis_pegawai_id ?? ''),
+                                    ])
+                                    @if(!$meeting->id && $meeting->notulis)<small class="mu">Nama lama “{{ $meeting->notulis }}” belum terhubung ke akun.</small>@endif
+                                    @if($meeting->id && empty($meeting->notulis_pegawai_id) && $meeting->notulis)<small class="mu">Nama lama “{{ $meeting->notulis }}” belum terhubung ke akun. Pilih pegawai agar menerima permintaan tanda tangan.</small>@endif
+                                </div>
                                 <div class="meeting-form-field"><label>Pemateri</label><input name="pemateri" value="{{ old('pemateri', $meeting->pemateri) }}"></div>
                             </div>
                             @include('partials.meeting-participants', ['participantPrefix' => 'admin-meeting'])
                         </section>
                         <section class="meeting-form-section">
                             <h3>Agenda dan dokumen</h3>
-                            <p class="mu">Tambahkan agenda, notulen, atau materi pendukung.</p>
+                            <p class="mu">Tambahkan agenda dan materi pendukung. Notulen diisi melalui halaman detail saat rapat berlangsung atau setelah rapat selesai.</p>
                             <div class="meeting-form-grid">
                                 <div class="meeting-form-field meeting-form-field-wide"><label>Agenda</label><textarea name="agenda" rows="4">{{ old('agenda', $meeting->agenda) }}</textarea></div>
-                                @if($canEditMinutes)
-                                    <div class="meeting-form-field meeting-form-field-wide"><label>Notulen</label><textarea name="notulen" rows="5">{{ old('notulen', $meeting->notulen) }}</textarea></div>
-                                    <div class="meeting-form-field meeting-form-field-wide"><label>PDF notulen <span>(maks. 15 MB)</span></label><input type="file" name="file_notulen" accept=".pdf"></div>
-                                    @if($meeting->file_notulen)<label class="meeting-form-field-wide meeting-remove-file"><input type="checkbox" name="hapus_file_notulen" value="1" style="width:auto"> Hapus PDF saat menyimpan</label>@endif
-                                @endif
                                 @if($canManageMaterials)
                                     <div class="meeting-form-field meeting-form-field-wide"><label>Unggah materi <span>(maks. 20 MB)</span></label><input type="file" name="materi_rapat" accept=".pdf,.ppt,.pptx,.doc,.docx,.zip"></div>
                                     @if($meeting->materi_rapat)<label class="meeting-form-field-wide meeting-remove-file"><input type="checkbox" name="hapus_materi_rapat" value="1" style="width:auto"> Hapus materi lama saat menyimpan</label>@endif
@@ -549,7 +622,7 @@
                 <div class="tw"><table><thead><tr><th>Nama</th><th>NIP</th><th>Waktu pulang</th><th>Status / keterangan</th></tr></thead><tbody>
                     @forelse($attendancePeople as $person)
                         <tr><td>{{ $person->nama }}</td><td>{{ $person->nip }}</td><td>{{ $person->waktu_pulang ? substr($person->waktu_pulang, 11, 5).' WITA' : '—' }}</td>
-                            <td>@if($person->waktu_pulang)<span class="tag hadir">Sudah Absen Pulang</span>@elseif(\App\Support\MeetingData::scheduleStatus($attendanceMeeting) === 'selesai')<span class="tag selesai">Belum Absen Pulang</span><br><small class="mu">Keterangan / alasan: {{ $person->alasan_pulang ?: 'Belum diisi pegawai (Alasan pulang duluan)' }}</small>@else<span class="tag akan">Menunggu rapat selesai</span>@endif</td>
+                            <td>@if($person->waktu_pulang)<span class="tag hadir">Sudah Absen Pulang</span>@elseif($person->alasan_pulang)<span class="tag selesai">Pulang lebih awal</span><br><small class="mu">Alasan: {{ $person->alasan_pulang }}</small>@elseif(\App\Support\MeetingData::scheduleStatus($attendanceMeeting) === 'selesai')<span class="tag selesai">Belum Absen Pulang</span><br><small class="mu">Alasan: Belum diisi pegawai.</small>@else<span class="tag akan">Menunggu rapat selesai</span>@endif</td>
                         </tr>
                     @empty
                         <tr><td colspan="4" class="mu">Belum ada pegawai yang absen masuk.</td></tr>
@@ -618,6 +691,7 @@
                 @if($isCompletedMeeting)@php($completedMeetingIndex++)@endif
                 @php($collapseCompletedMeeting = $isCompletedMeeting && $completedMeetingIndex > 4)
                 @php($attendees = $meetingAttendees->get($meeting->id, collect()))
+                @php($guestAttendees = $guestMeetingAttendees->get($meeting->id, collect()))
                 <article class="admin-meeting-card" data-admin-meeting-card data-meeting-status="{{ $scheduleStatus }}" @if($isCompletedMeeting)data-admin-completed-meeting data-completed-index="{{ $completedMeetingIndex }}" @endif @if($collapseCompletedMeeting)hidden @endif>
                     <div class="admin-meeting-card-main">
                         <div class="admin-meeting-date-icon" aria-hidden="true"><span>◷</span></div>
@@ -634,6 +708,7 @@
                             <div class="admin-meeting-card-actions">
                                 @if($canViewAttendance)
                                     <a class="btn sm admin-meeting-attendance" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">{{ $isSuperAdmin ? (\App\Support\MeetingData::attendanceOpen($meeting) ? 'Kode '.$meeting->kode_presensi : 'Atur presensi') : 'Lihat presensi' }}</a>
+                                    <a class="btn sm" href="{{ route('meetings.report.export', $meeting->id) }}">Unduh PDF Notulen + Daftar Hadir</a>
                                 @endif
                                 @if($canCreateMeetings)
                                     <a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'edit' => $meeting->id]) }}">Ubah</a>
@@ -670,8 +745,10 @@
                                             <td>
                                                 @if($person->waktu_pulang)
                                                     <span class="tag hadir">Sudah Absen Pulang</span>
+                                                @elseif($person->alasan_pulang)
+                                                    <span class="tag selesai">Pulang lebih awal</span><br><small class="mu">Alasan: {{ $person->alasan_pulang }}</small>
                                                 @elseif($scheduleStatus === 'selesai')
-                                                    <span class="tag selesai">Belum Absen Pulang</span><br><small class="mu">Keterangan / alasan: {{ $person->alasan_pulang ?: 'Belum diisi pegawai (Alasan pulang duluan)' }}</small>
+                                                    <span class="tag selesai">Belum Absen Pulang</span><br><small class="mu">Alasan: Belum diisi pegawai.</small>
                                                 @else
                                                     <span class="tag akan">Menunggu rapat selesai</span>
                                                 @endif
@@ -679,6 +756,19 @@
                                         </tr>
                                     @empty
                                         <tr><td colspan="4" class="mu">Belum ada pegawai yang absen masuk.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table></div>
+                        </details>
+                        <details class="admin-meeting-details admin-guest-attendance-details">
+                            <summary>Presensi tamu / mahasiswa <span>{{ $guestAttendees->count() }} peserta</span></summary>
+                            <div class="tw mt-2"><table>
+                                <thead><tr><th>Nama</th><th>Jenis peserta</th><th>Asal</th><th>NIM</th><th>Absen masuk</th><th>Absen pulang</th></tr></thead>
+                                <tbody>
+                                    @forelse($guestAttendees as $guest)
+                                        <tr><td>{{ $guest->nama }}</td><td>{{ ucfirst($guest->jenis) }}</td><td>{{ $guest->asal }}</td><td>{{ $guest->nim ?: '—' }}</td><td>{{ substr($guest->waktu, 11, 5) }} WITA</td><td>{{ $guest->waktu_pulang ? substr($guest->waktu_pulang, 11, 5).' WITA' : 'Belum absen pulang' }}</td></tr>
+                                    @empty
+                                        <tr><td colspan="6" class="mu">Belum ada presensi tamu atau mahasiswa.</td></tr>
                                     @endforelse
                                 </tbody>
                             </table></div>

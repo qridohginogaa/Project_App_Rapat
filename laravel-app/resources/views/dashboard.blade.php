@@ -6,6 +6,17 @@
     <h2>Jadwal rapat</h2>
     <span>Pantau rapat yang akan datang dan sedang berlangsung.</span>
 </section>
+@unless($canSeeMeetings)
+    <a class="dashboard-guest-attendance" href="{{ route('guest-attendance') }}">
+        <span class="dashboard-guest-attendance-icon" aria-hidden="true">✓</span>
+        <span class="dashboard-guest-attendance-copy">
+            <small class="dashboard-guest-attendance-label">FORMULIR ONLINE</small>
+            <b>Presensi Tamu &amp; Mahasiswa</b>
+            <small>Catat kehadiran rapat dengan mudah dan cepat.</small>
+        </span>
+        <span class="dashboard-guest-attendance-action">Isi presensi <span aria-hidden="true">→</span></span>
+    </a>
+@endunless
 <div class="dashboard-stats grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
     @foreach(['akan' => 'Akan datang', 'berlangsung' => 'Sedang berlangsung'] as $key => $label)
         <div class="stat"><b>{{ $meetingsByStatus[$key]->count() }}</b><span>{{ $label }}</span></div>
@@ -46,7 +57,7 @@
                         <div class="jam">{{ substr($meeting->mulai, 0, 5) }}<small>{{ substr($meeting->selesai, 0, 5) }}</small></div>
                         <div class="grow">
                             <b>{{ $meeting->judul }}</b>
-                            <p class="mu">{{ \App\Support\MeetingData::date($meeting->tanggal) }} · {{ $meeting->tempat ?: 'Tempat belum ditentukan' }} · {{ $meeting->moda }} · 👥 {{ $meeting->jumlah_hadir }} hadir</p>
+                            <p class="mu">{{ \App\Support\MeetingData::date($meeting->tanggal) }} · {{ $meeting->tempat ?: 'Tempat belum ditentukan' }} · {{ $meeting->moda }} · 👥 {{ $meeting->jumlah_hadir }} pegawai hadir · {{ $meeting->jumlah_tamu }} tamu</p>
                         </div>
                     </a>
                     @if(\App\Support\MeetingData::attendanceOpen($meeting) && (!$employee || !$meeting->status_kehadiran))<span class="tag hadir">🟢 Presensi buka</span>@endif
@@ -155,7 +166,10 @@
     </div>
     <div class="calendar-content">
         <div class="calendar-heading flex flex-wrap justify-between items-center gap-3">
-            <div><h2 id="calendar-title" class="mt-0">Kalender rapat</h2><span id="calendar-month" class="mu"></span></div>
+            <div>
+                <h2 id="calendar-title" class="mt-0">Kalender rapat</h2>
+                <span id="calendar-month" class="mu"></span>
+            </div>
             <div class="flex gap-2">
                 <button class="btn sm" id="calendar-prev" type="button" aria-label="Bulan sebelumnya">‹</button>
                 <button class="btn sm" id="calendar-today" type="button">Hari ini</button>
@@ -163,16 +177,24 @@
             </div>
         </div>
         <div id="calendar-grid" class="calendar-grid" aria-live="polite"></div>
-        <div id="calendar-events" class="calendar-events" aria-live="polite">Pilih tanggal bertanda untuk melihat rapat.</div>
+        <div class="calendar-legend" aria-label="Keterangan kalender">
+            <span><i class="calendar-legend-holiday"></i>Libur nasional</span>
+            <span><i class="calendar-legend-collective"></i>Cuti bersama</span>
+            <span><i class="calendar-legend-meeting"></i>Jadwal rapat</span>
+        </div>
+        <div id="calendar-events" class="calendar-events" aria-live="polite">Pilih tanggal bertanda untuk melihat hari libur atau rapat.</div>
+        <small class="calendar-source"><span data-calendar-source-year></span> Rujukan: <a href="https://setneg.go.id/baca/index/inilah_skb_3_menteri_libur_nasional_dan_cuti_bersama_2026" target="_blank" rel="noopener noreferrer">SKB 2026</a> · <a href="https://setneg.go.id/baca/index/inilah_skb_3_menteri_libur_nasional_dan_cuti_bersama_2027" target="_blank" rel="noopener noreferrer">SKB 2027</a></small>
     </div>
 </section>
 <script>
 (function () {
     var events = @js($calendarEvents);
+    var holidaysByYear = @js($indonesianHolidays);
     var canOpen = @js($canSeeMeetings);
     var grid = document.getElementById('calendar-grid');
     var monthLabel = document.getElementById('calendar-month');
     var eventList = document.getElementById('calendar-events');
+    var sourceYear = document.querySelector('[data-calendar-source-year]');
     var dayLabels = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Makassar', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
     var values = {};
@@ -180,11 +202,21 @@
     var today = values.year + '-' + values.month + '-' + values.day;
     var shown = new Date(Date.UTC(Number(values.year), Number(values.month) - 1, 1));
     var grouped = {};
+    var groupedHolidays = {};
     events.forEach(function (event) { (grouped[event.date] ||= []).push(event); });
+    Object.keys(holidaysByYear).forEach(function (holidayYear) {
+        holidaysByYear[holidayYear].forEach(function (holiday) {
+            (groupedHolidays[holiday.date] ||= []).push(holiday);
+        });
+    });
 
     function renderCalendar() {
         var year = shown.getUTCFullYear();
         var month = shown.getUTCMonth();
+        var holidays = holidaysByYear[year] || [];
+        sourceYear.textContent = holidays.length
+            ? 'Hari libur nasional dan cuti bersama ' + year + ' mengikuti SKB 3 Menteri.'
+            : 'Data hari libur nasional resmi belum tersedia untuk tahun ' + year + '.';
         monthLabel.textContent = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric', timeZone: 'Asia/Makassar' }).format(shown);
         grid.replaceChildren();
         dayLabels.forEach(function (label) {
@@ -194,30 +226,49 @@
             grid.appendChild(cell);
         });
         var offset = new Date(Date.UTC(year, month, 1)).getUTCDay();
-        for (var blank = 0; blank < offset; blank++) grid.appendChild(document.createElement('span'));
         var days = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        for (var blank = 0; blank < offset; blank++) grid.appendChild(document.createElement('span'));
         for (var day = 1; day <= days; day++) {
             var key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
             var dayEvents = grouped[key] || [];
-            var cell = document.createElement(dayEvents.length && canOpen ? 'button' : 'span');
-            cell.className = 'calendar-day' + (key === today ? ' is-today' : '') + (dayEvents.length ? ' has-events' : '');
+            var dayHolidays = groupedHolidays[key] || [];
+            var hasVisibleMeetings = dayEvents.length && canOpen;
+            var hasSelectableItems = dayHolidays.length || hasVisibleMeetings;
+            var cell = document.createElement(hasSelectableItems ? 'button' : 'span');
+            cell.className = 'calendar-day'
+                + (key === today ? ' is-today' : '')
+                + (hasVisibleMeetings ? ' has-events' : '')
+                + (dayHolidays.some(function (holiday) { return holiday.type === 'national'; }) ? ' has-national-holiday' : '')
+                + (dayHolidays.some(function (holiday) { return holiday.type === 'collective'; }) ? ' has-collective-leave' : '');
             cell.textContent = day;
-            if (dayEvents.length && canOpen) {
+            if (hasSelectableItems) {
                 cell.type = 'button';
-                cell.addEventListener('click', function (selected, selectedEvents) {
+                cell.setAttribute('aria-label', [
+                    new Intl.DateTimeFormat('id-ID', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(key + 'T12:00:00Z')),
+                    dayHolidays.map(function (holiday) { return holiday.title; }).join(', '),
+                    hasVisibleMeetings ? dayEvents.length + ' rapat' : ''
+                ].filter(Boolean).join('; '));
+                if (dayHolidays.length) cell.title = dayHolidays.map(function (holiday) { return holiday.title; }).join(', ');
+                cell.addEventListener('click', function (selected, selectedEvents, selectedHolidays) {
                     return function () {
                         eventList.replaceChildren();
                         var heading = document.createElement('b');
                         heading.textContent = new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: 'Asia/Makassar' }).format(new Date(selected + 'T12:00:00+08:00'));
                         eventList.appendChild(heading);
-                        selectedEvents.forEach(function (event) {
+                        selectedHolidays.forEach(function (holiday) {
+                            var item = document.createElement('span');
+                            item.className = 'calendar-holiday-item ' + (holiday.type === 'collective' ? 'is-collective' : 'is-national');
+                            item.textContent = (holiday.type === 'collective' ? 'Cuti bersama: ' : 'Libur nasional: ') + holiday.title;
+                            eventList.appendChild(item);
+                        });
+                        if (canOpen) selectedEvents.forEach(function (event) {
                             var link = document.createElement('a');
                             link.href = @js(route('meetings.show', ['meeting' => '__ID__'])).replace('__ID__', encodeURIComponent(event.id));
                             link.textContent = event.title;
                             eventList.appendChild(link);
                         });
                     };
-                }(key, dayEvents));
+                }(key, dayEvents, dayHolidays));
             } else if (dayEvents.length) {
                 cell.setAttribute('aria-label', dayEvents.length + ' rapat');
             }

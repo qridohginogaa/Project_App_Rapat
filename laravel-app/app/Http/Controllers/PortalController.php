@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Support\MeetingData;
+use App\Support\MeetingReportDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -115,6 +116,10 @@ class PortalController extends Controller
                 DB::table('kehadiran as hadir')->selectRaw('COUNT(*)')->whereColumn('hadir.rapat_id', 'r.id')->where('hadir.status', 'hadir'),
                 'jumlah_hadir'
             )
+            ->selectSub(
+                DB::table('kehadiran_tamu')->selectRaw('COUNT(*)')->whereColumn('kehadiran_tamu.rapat_id', 'r.id'),
+                'jumlah_tamu'
+            )
             ->orderBy('r.tanggal')
             ->orderBy('r.mulai')
             ->get();
@@ -154,6 +159,7 @@ class PortalController extends Controller
             'meetingsByStatus' => $byStatus,
             'waiting' => $waiting,
             'calendarEvents' => $calendarEvents,
+            'indonesianHolidays' => config('indonesian_holidays'),
             'rooms' => DB::table('ruang_rapat')->where('aktif', 1)->orderBy('nama')->get(),
             'employees' => DB::table('pegawai')->select('id', 'nip', 'nama', 'jabatan')->orderBy('nama')->get(),
         ]);
@@ -286,10 +292,12 @@ class PortalController extends Controller
             'link_rekaman' => ['nullable', 'url', 'regex:#^https://(drive|docs)\.google\.com/|^https://(www\.)?youtube\.com/|^https://youtu\.be/#i'],
             'pimpinan' => ['nullable', 'string', 'max:200'],
             'notulis' => ['nullable', 'string', 'max:200'],
+            'pimpinan_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
+            'notulis_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'pemateri' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string'],
-            'notulen' => ['nullable', 'string'],
-            'file_notulen' => ['nullable', 'file', 'mimes:pdf', 'max:15360'],
+            'notulen' => ['prohibited'],
+            'file_notulen' => ['prohibited'],
             'materi' => ['nullable', 'file', 'mimes:pdf,ppt,pptx,odp,doc,docx,xls,xlsx,ods,zip,jpg,jpeg,png', 'max:20480'],
             'semua_pegawai' => ['sometimes', 'boolean'],
             'peserta' => ['nullable', 'array'],
@@ -318,7 +326,6 @@ class PortalController extends Controller
         if (!$request->boolean('semua_pegawai') && empty($data['peserta'])) {
             return back()->withErrors(['peserta' => 'Pilih rapat untuk semua pegawai atau centang minimal satu pegawai undangan.'])->withInput();
         }
-        abort_unless($this->isSuperAdminMode() || $permissions['notulen'] || (empty($data['notulen']) && !$request->hasFile('file_notulen')), 403);
         abort_unless($this->isSuperAdminMode() || $permissions['materi'] || !$request->hasFile('materi'), 403);
         abort_unless($this->isSuperAdminMode() || $permissions['rekaman'] || empty($data['link_rekaman']), 403);
         $room = !empty($data['room_id'])
@@ -327,13 +334,18 @@ class PortalController extends Controller
         if (!empty($data['room_id']) && !$room) {
             return back()->withErrors(['room_id' => 'Pilih ruang rapat yang aktif.'])->withInput();
         }
-        $file = $request->file('file_notulen');
-        $filename = $file ? $this->storeUpload($file) : null;
         $material = $request->file('materi');
         $materialFilename = $material ? $this->storeUpload($material) : null;
         $participantIds = $request->boolean('semua_pegawai') ? [] : ($data['peserta'] ?? []);
 
-        DB::transaction(function () use ($data, $room, $filename, $material, $materialFilename, $employee, $participantIds) {
+        $signerIds = array_values(array_filter([
+            $data['pimpinan_pegawai_id'] ?? null,
+            $data['notulis_pegawai_id'] ?? null,
+        ]));
+        $signers = $signerIds
+            ? DB::table('pegawai')->whereIn('id', $signerIds)->get(['id', 'nama'])->keyBy('id')
+            : collect();
+        $meetingId = DB::transaction(function () use ($data, $room, $material, $materialFilename, $employee, $participantIds, $signers) {
             $meetingId = DB::table('rapat')->insertGetId([
                 'judul' => $data['judul'],
                 'tanggal' => $data['tanggal'],
@@ -343,12 +355,12 @@ class PortalController extends Controller
                 'room_id' => $room->id ?? null,
                 'link_meeting' => $data['link_meeting'] ?? null,
                 'moda' => $data['moda'],
-                'pimpinan' => $data['pimpinan'] ?? '',
-                'notulis' => $data['notulis'] ?? '',
+                'pimpinan' => $signers[$data['pimpinan_pegawai_id'] ?? 0]->nama ?? ($data['pimpinan'] ?? ''),
+                'pimpinan_pegawai_id' => $data['pimpinan_pegawai_id'] ?? null,
+                'notulis' => $signers[$data['notulis_pegawai_id'] ?? 0]->nama ?? ($data['notulis'] ?? ''),
+                'notulis_pegawai_id' => $data['notulis_pegawai_id'] ?? null,
                 'pemateri' => $data['pemateri'] ?? '',
                 'agenda' => $data['agenda'] ?? '',
-                'notulen' => $data['notulen'] ?? '',
-                'file_notulen' => $filename,
                 'link_rekaman' => $data['link_rekaman'] ?? null,
                 'materi_rapat' => $materialFilename,
             ]);
@@ -362,7 +374,14 @@ class PortalController extends Controller
                     'pengunggah' => $employee->nama,
                 ]);
             }
+            return $meetingId;
         });
+        $this->syncMeetingSignatures(
+            $meetingId,
+            isset($data['pimpinan_pegawai_id']) ? (int) $data['pimpinan_pegawai_id'] : null,
+            isset($data['notulis_pegawai_id']) ? (int) $data['notulis_pegawai_id'] : null,
+            true
+        );
 
         return redirect('/#pencarianPegawai')->with('success', 'Rapat berhasil ditambahkan. Kode presensi dikelola Pengelola Rapat.');
     }
@@ -426,6 +445,369 @@ class PortalController extends Controller
                 ];
             })->values(),
         ]);
+    }
+
+    public function exportAttendance(int $meeting, string $type)
+    {
+        abort_unless($this->isAdminMode(), 403);
+        $employee = $this->employee();
+        $permissions = $this->superAdminPermissions($employee);
+        abort_unless($this->isSuperAdminMode() || $permissions['lihat_daftar_hadir'], 403);
+
+        $meetingRecord = DB::table('rapat')->where('id', $meeting)->first();
+        abort_unless($meetingRecord && MeetingData::scheduleStatus($meetingRecord) === 'selesai', 404);
+
+        if ($type === 'pegawai') {
+            $headers = ['Nama', 'NIP', 'Absen masuk', 'Absen pulang', 'Keterangan absen pulang'];
+            $attendees = DB::table('kehadiran as k')
+                ->join('pegawai as p', 'p.id', '=', 'k.pegawai_id')
+                ->where('k.rapat_id', $meeting)
+                ->where('k.status', 'hadir')
+                ->select('p.nama', 'p.nip', 'k.waktu', 'k.waktu_pulang', 'k.alasan_pulang')
+                ->orderBy('k.waktu')
+                ->get();
+            $attendanceRows = $attendees->map(fn ($person) => [
+                $person->nama,
+                $person->nip,
+                $person->waktu ? substr($person->waktu, 11, 5).' WITA' : '—',
+                $person->waktu_pulang ? substr($person->waktu_pulang, 11, 5).' WITA' : '—',
+                $person->waktu_pulang
+                    ? 'Sudah Absen Pulang'
+                    : ($person->alasan_pulang
+                        ? 'Pulang lebih awal: '.$person->alasan_pulang
+                        : 'Belum Absen Pulang; alasan belum diisi.'),
+            ]);
+            $worksheet = 'Presensi Pegawai';
+        } else {
+            $headers = ['Nama', 'Jenis peserta', 'Instansi / program studi', 'NIM', 'Absen masuk', 'Absen pulang'];
+            $attendees = DB::table('kehadiran_tamu')
+                ->where('rapat_id', $meeting)
+                ->select('nama', 'jenis', 'asal', 'nim', 'waktu', 'waktu_pulang')
+                ->orderBy('waktu')
+                ->get();
+            $attendanceRows = $attendees->map(fn ($guest) => [
+                $guest->nama,
+                ucfirst($guest->jenis),
+                $guest->asal,
+                $guest->nim ?: '—',
+                $guest->waktu ? substr($guest->waktu, 11, 5).' WITA' : '—',
+                $guest->waktu_pulang ? substr($guest->waktu_pulang, 11, 5).' WITA' : 'Belum absen pulang',
+            ]);
+            $worksheet = 'Presensi Tamu';
+        }
+
+        $rows = [
+            ['Judul rapat', $meetingRecord->judul],
+            ['Tanggal rapat', MeetingData::date($meetingRecord->tanggal)],
+            ['Jenis presensi', $type === 'pegawai' ? 'Pegawai' : 'Tamu / mahasiswa'],
+            [],
+            $headers,
+            ...$attendanceRows->all(),
+        ];
+        $xmlRows = collect($rows)->map(function (array $row) {
+            $cells = collect($row)->map(fn ($value) => '<Cell><Data ss:Type="String">'.htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8').'</Data></Cell>')->implode('');
+            return '<Row>'.$cells.'</Row>';
+        })->implode('');
+        $filename = Str::slug($meetingRecord->judul).'-presensi-'.$type.'.xls';
+
+        return response()->streamDownload(function () use ($xmlRows, $worksheet) {
+            echo '<?xml version="1.0" encoding="UTF-8"?>';
+            echo '<?mso-application progid="Excel.Sheet"?>';
+            echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">';
+            echo '<Worksheet ss:Name="'.$worksheet.'"><Table>'.$xmlRows.'</Table></Worksheet></Workbook>';
+        }, $filename, ['Content-Type' => 'application/vnd.ms-excel; charset=UTF-8']);
+    }
+
+    public function exportMeetingReport(int $meeting)
+    {
+        abort_unless($this->isAdminMode(), 403);
+        $employee = $this->employee();
+        $permissions = $this->superAdminPermissions($employee);
+        abort_unless($this->isSuperAdminMode() || $permissions['lihat_daftar_hadir'], 403);
+
+        $meetingRecord = DB::table('rapat')->where('id', $meeting)->first();
+        abort_unless($meetingRecord !== null, 404);
+        if (MeetingData::scheduleStatus($meetingRecord) !== 'selesai' || trim((string) $meetingRecord->notulen) === '') {
+            return back()->withErrors(['notulen' => 'PDF final tersedia setelah rapat selesai dan notulen diisi.']);
+        }
+
+        $reportData = $this->meetingReportData($meetingRecord);
+        $documentHash = $this->meetingReportHash($meetingRecord, $reportData);
+        $this->resetStaleMeetingSignatures($meeting, $documentHash);
+        $signatures = DB::table('meeting_signatures as s')
+            ->join('pegawai as p', 'p.id', '=', 's.pegawai_id')
+            ->where('s.rapat_id', $meeting)
+            ->orderByRaw("CASE s.peran WHEN 'pimpinan' THEN 0 ELSE 1 END")
+            ->get([
+                's.peran',
+                's.token',
+                's.status',
+                's.disetujui_pada',
+                's.document_hash',
+                'p.nama as pegawai_nama',
+            ]);
+        if (
+            $signatures->count() !== 2
+            || $signatures->contains(fn ($signature) => $signature->status !== 'disetujui'
+                || !hash_equals((string) $signature->document_hash, $documentHash))
+        ) {
+            return back()->withErrors(['tanda_tangan' => 'PDF final hanya tersedia setelah pimpinan rapat dan notulis menyetujui notulen versi terbaru.']);
+        }
+
+        $pdf = MeetingReportDocument::render(
+            $meetingRecord,
+            $reportData['attendanceRows']->all(),
+            $reportData['followUps']->all(),
+            $signatures->all(),
+            rtrim((string) config('app.url'), '/').'/signatures/verify'
+        );
+        $filename = (Str::slug($meetingRecord->judul) ?: 'rapat').'-notulen-daftar-hadir.pdf';
+
+        return response()->streamDownload(
+            fn () => print($pdf),
+            $filename,
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
+    public function signatureInbox()
+    {
+        $employee = $this->employee();
+        abort_unless($employee !== null, 403);
+        $requests = DB::table('meeting_signatures as s')
+            ->join('rapat as r', 'r.id', '=', 's.rapat_id')
+            ->where('s.pegawai_id', $employee->id)
+            ->orderByDesc('r.tanggal')
+            ->orderByDesc('r.mulai')
+            ->get([
+                's.id',
+                's.rapat_id',
+                's.peran',
+                's.status',
+                's.disetujui_pada',
+                's.document_hash',
+                'r.judul',
+                'r.tanggal',
+                'r.mulai',
+                'r.selesai',
+                'r.tempat',
+                'r.moda',
+                'r.link_meeting',
+                'r.pimpinan',
+                'r.notulis',
+                'r.agenda',
+                'r.pemateri',
+                'r.notulen',
+                'r.ended_at',
+            ])
+            ->map(function ($signature) {
+                $signature->can_sign = trim((string) $signature->notulen) !== ''
+                    && MeetingData::scheduleStatus($signature) === 'selesai';
+
+                if ($signature->can_sign) {
+                    $meeting = DB::table('rapat')->where('id', $signature->rapat_id)->first();
+                    $documentHash = $this->meetingReportHash($meeting, $this->meetingReportData($meeting));
+                    $this->resetStaleMeetingSignatures($signature->rapat_id, $documentHash);
+                    $current = DB::table('meeting_signatures')->where('id', $signature->id)->first();
+                    $signature->status = $current->status;
+                    $signature->disetujui_pada = $current->disetujui_pada;
+                }
+
+                return $signature;
+            })
+            ->values();
+
+        return view('signatures.index', [
+            'employee' => $employee,
+            'signatures' => $requests,
+            'pendingSignatureCount' => $requests->where('status', 'menunggu')->count(),
+        ]);
+    }
+
+    public function acceptMeetingSignature(Request $request, int $meeting, string $role)
+    {
+        abort_unless(in_array($role, ['pimpinan', 'notulis'], true), 404);
+        $employee = $this->employee();
+        abort_unless($employee !== null, 403);
+        $meetingRecord = DB::table('rapat')->where('id', $meeting)->first();
+        abort_unless($meetingRecord !== null, 404);
+        abort_unless(
+            (int) $meetingRecord->{$role.'_pegawai_id'} === (int) $employee->id,
+            403
+        );
+
+        if (MeetingData::scheduleStatus($meetingRecord) !== 'selesai' || trim((string) $meetingRecord->notulen) === '') {
+            return back()->withErrors(['tanda_tangan' => 'Notulen dapat disetujui setelah rapat selesai dan notulen diisi.']);
+        }
+
+        $reportData = $this->meetingReportData($meetingRecord);
+        $documentHash = $this->meetingReportHash($meetingRecord, $reportData);
+        $this->resetStaleMeetingSignatures($meeting, $documentHash);
+        $signature = DB::table('meeting_signatures')
+            ->where('rapat_id', $meeting)
+            ->where('peran', $role)
+            ->where('pegawai_id', $employee->id)
+            ->first();
+        abort_unless($signature !== null, 404);
+
+        if ($signature->status !== 'disetujui') {
+            DB::table('meeting_signatures')->where('id', $signature->id)->update([
+                'status' => 'disetujui',
+                'disetujui_pada' => now(),
+                'document_hash' => $documentHash,
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect()->route('signatures.index')->with('status', 'Persetujuan tanda tangan berhasil dicatat.');
+    }
+
+    public function verifyMeetingSignature(string $token)
+    {
+        $signature = DB::table('meeting_signatures as s')
+            ->join('rapat as r', 'r.id', '=', 's.rapat_id')
+            ->join('pegawai as p', 'p.id', '=', 's.pegawai_id')
+            ->where('s.token', $token)
+            ->first([
+                's.peran',
+                's.status',
+                's.disetujui_pada',
+                's.document_hash',
+                's.rapat_id',
+                'r.judul',
+                'r.tanggal',
+                'r.mulai',
+                'r.selesai',
+                'r.tempat',
+                'r.moda',
+                'r.link_meeting',
+                'r.pimpinan',
+                'r.notulis',
+                'r.agenda',
+                'r.pemateri',
+                'r.notulen',
+                'r.ended_at',
+                'p.nama as pegawai_nama',
+                'p.nip as pegawai_nip',
+                'p.jabatan as pegawai_jabatan',
+            ]);
+        $verificationCode = implode('-', str_split(strtoupper(substr($token, 0, 12)), 4));
+        if ($signature === null) {
+            return response()->view('signatures.verify', [
+                'signature' => null,
+                'valid' => false,
+                'verificationCode' => $verificationCode,
+            ]);
+        }
+
+        $meeting = DB::table('rapat')->where('id', $signature->rapat_id)->first();
+        $reportData = $this->meetingReportData($meeting);
+        $documentHash = $this->meetingReportHash($meeting, $reportData);
+        $bothApproved = DB::table('meeting_signatures')
+            ->where('rapat_id', $signature->rapat_id)
+            ->whereIn('peran', ['pimpinan', 'notulis'])
+            ->where('status', 'disetujui')
+            ->where('document_hash', $documentHash)
+            ->count() === 2;
+        $valid = $signature->status === 'disetujui'
+            && $signature->document_hash
+            && hash_equals($signature->document_hash, $documentHash)
+            && $bothApproved;
+
+        return response()->view('signatures.verify', [
+            'signature' => $signature,
+            'valid' => $valid,
+            'verificationCode' => $verificationCode,
+        ]);
+    }
+
+    private function meetingReportData(object $meeting): array
+    {
+        $employees = DB::table('kehadiran as k')
+            ->join('pegawai as p', 'p.id', '=', 'k.pegawai_id')
+            ->where('k.rapat_id', $meeting->id)
+            ->where('k.status', 'hadir')
+            ->selectRaw("'Pegawai' as jenis")
+            ->addSelect('p.nama', 'p.nip as identitas', 'p.jabatan as unit', 'k.waktu')
+            ->get();
+        $guests = DB::table('kehadiran_tamu')
+            ->where('rapat_id', $meeting->id)
+            ->select('jenis', 'nama', 'nim as identitas', 'asal as unit', 'waktu')
+            ->get()
+            ->map(function ($guest) {
+                $guest->jenis = ucfirst($guest->jenis);
+                $guest->identitas = $guest->identitas ?: '—';
+                return $guest;
+            });
+        $attendanceRows = $employees->concat($guests)->sortBy('waktu')->values();
+        $followUps = DB::table('penugasan as t')
+            ->leftJoin('pegawai as p', 'p.id', '=', 't.pegawai_id')
+            ->where('t.rapat_id', $meeting->id)
+            ->select('t.tugas', 't.nama_petugas', 'p.nama as pegawai_nama', 't.deadline', 't.status')
+            ->orderBy('t.id')
+            ->get();
+
+        return compact('attendanceRows', 'followUps');
+    }
+
+    private function meetingReportHash(object $meeting, array $reportData): string
+    {
+        $meetingFields = [];
+        foreach ([
+            'judul', 'tanggal', 'mulai', 'selesai', 'tempat', 'moda', 'link_meeting',
+            'pimpinan', 'notulis', 'agenda', 'pemateri', 'notulen',
+        ] as $field) {
+            $meetingFields[$field] = $meeting->$field;
+        }
+
+        return hash('sha256', json_encode([
+            'meeting' => $meetingFields,
+            'attendance' => $reportData['attendanceRows']->all(),
+            'follow_ups' => $reportData['followUps']->all(),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    }
+
+    private function resetStaleMeetingSignatures(int $meeting, string $documentHash): void
+    {
+        foreach (DB::table('meeting_signatures')->where('rapat_id', $meeting)->where('status', 'disetujui')->get() as $signature) {
+            if ($signature->document_hash !== $documentHash) {
+                DB::table('meeting_signatures')->where('id', $signature->id)->update([
+                    'token' => Str::random(64),
+                    'status' => 'menunggu',
+                    'disetujui_pada' => null,
+                    'document_hash' => null,
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+    }
+
+    private function syncMeetingSignatures(int $meeting, ?int $chairId, ?int $minuteTakerId, bool $documentChanged): void
+    {
+        foreach (['pimpinan' => $chairId, 'notulis' => $minuteTakerId] as $role => $employeeId) {
+            $existing = DB::table('meeting_signatures')->where('rapat_id', $meeting)->where('peran', $role)->first();
+            if (!$employeeId) {
+                if ($existing) {
+                    DB::table('meeting_signatures')->where('id', $existing->id)->delete();
+                }
+                continue;
+            }
+
+            if (!$existing || (int) $existing->pegawai_id !== $employeeId || $documentChanged) {
+                DB::table('meeting_signatures')->updateOrInsert(
+                    ['rapat_id' => $meeting, 'peran' => $role],
+                    [
+                        'pegawai_id' => $employeeId,
+                        'token' => Str::random(64),
+                        'status' => 'menunggu',
+                        'disetujui_pada' => null,
+                        'document_hash' => null,
+                        'created_at' => $existing->created_at ?? now(),
+                        'updated_at' => now(),
+                    ]
+                );
+            }
+        }
     }
 
     public function admin(Request $request, ?string $tab = 'rapat')
@@ -527,6 +909,14 @@ class PortalController extends Controller
                     ->orderBy('k.waktu')
                     ->get()
                     ->groupBy('rapat_id');
+            $data['completedMeetingGuestAttendees'] = $data['completedMeetings']->isEmpty()
+                ? collect()
+                : DB::table('kehadiran_tamu')
+                    ->whereIn('rapat_id', $data['completedMeetings']->pluck('id'))
+                    ->select('rapat_id', 'nama', 'jenis', 'asal', 'nim', 'waktu', 'waktu_pulang')
+                    ->orderBy('waktu')
+                    ->get()
+                    ->groupBy('rapat_id');
             $data['leaveRequests'] = DB::table('kehadiran as k')
                 ->join('pegawai as p', 'p.id', '=', 'k.pegawai_id')
                 ->join('rapat as r', 'r.id', '=', 'k.rapat_id')
@@ -543,6 +933,11 @@ class PortalController extends Controller
                 ->where('k.status', 'hadir')
                 ->select('k.rapat_id', 'p.nama', 'p.nip', 'k.waktu', 'k.waktu_pulang', 'k.alasan_pulang')
                 ->orderBy('k.waktu')
+                ->get()
+                ->groupBy('rapat_id');
+            $data['guestMeetingAttendees'] = DB::table('kehadiran_tamu')
+                ->whereIn('rapat_id', $data['meetings']->pluck('id'))
+                ->orderBy('waktu')
                 ->get()
                 ->groupBy('rapat_id');
             $data['editMeeting'] = $request->filled('edit')
@@ -821,9 +1216,9 @@ class PortalController extends Controller
         $isSuperAdmin = $this->isSuperAdminMode();
         $permissions = $this->superAdminPermissions($employee);
         abort_unless($isSuperAdmin || $permissions['buat_rapat'], 403);
-        $canEditMinutes = $isSuperAdmin || $permissions['notulen'];
         $canManageMaterials = $isSuperAdmin || $permissions['materi'];
         $canManageRecordings = $isSuperAdmin || $permissions['rekaman'];
+        $canEditMinutes = $isSuperAdmin || $permissions['notulen'];
         abort_unless($canEditMinutes || (
             !$request->has('notulen')
             && !$request->hasFile('file_notulen')
@@ -848,9 +1243,12 @@ class PortalController extends Controller
             'notulis' => ['nullable', 'string', 'max:200'],
             'pemateri' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string'],
+            'pimpinan_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
+            'notulis_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'link_rekaman' => ['nullable', 'url', 'regex:#^https://(drive|docs)\.google\.com/|^https://(www\.)?youtube\.com/|^https://youtu\.be/#i'],
-            'notulen' => ['nullable', 'string'],
-            'file_notulen' => ['nullable', 'file', 'mimes:pdf', 'max:15360'],
+            'notulen' => ['prohibited'],
+            'file_notulen' => ['prohibited'],
+            'hapus_file_notulen' => ['prohibited'],
             'materi_rapat' => ['nullable', 'file', 'mimes:pdf,ppt,pptx,doc,docx,zip', 'max:20480'],
             'semua_pegawai' => ['sometimes', 'boolean'],
             'peserta' => ['nullable', 'array'],
@@ -885,18 +1283,27 @@ class PortalController extends Controller
         if ($room && !$room->aktif && (int) ($old->room_id ?? 0) !== (int) $room->id) {
             return back()->withErrors(['room_id' => 'Ruang nonaktif hanya dapat dipertahankan pada rapat yang sudah menggunakannya.'])->withInput();
         }
+        $chairId = isset($data['pimpinan_pegawai_id']) ? (int) $data['pimpinan_pegawai_id'] : null;
+        $minuteTakerId = isset($data['notulis_pegawai_id']) ? (int) $data['notulis_pegawai_id'] : null;
+        $signerIds = array_values(array_filter([$chairId, $minuteTakerId]));
+        $signers = $signerIds
+            ? DB::table('pegawai')->whereIn('id', $signerIds)->get(['id', 'nama'])->keyBy('id')
+            : collect();
         $values = [
             'judul' => $data['judul'], 'tanggal' => $data['tanggal'], 'mulai' => $data['mulai'],
             'selesai' => $data['selesai'], 'tempat' => $room->nama ?? ($data['tempat'] ?? ''),
             'room_id' => $room->id ?? null, 'link_meeting' => $data['link_meeting'] ?? null,
-            'moda' => $data['moda'], 'pimpinan' => $data['pimpinan'] ?? '',
-            'notulis' => $data['notulis'] ?? '', 'pemateri' => $data['pemateri'] ?? '',
+            'moda' => $data['moda'],
+            'pimpinan' => $signers[$chairId ?? 0]->nama ?? (!$old || empty($old->pimpinan_pegawai_id) ? ($old->pimpinan ?? '') : ''),
+            'pimpinan_pegawai_id' => $chairId,
+            'notulis' => $signers[$minuteTakerId ?? 0]->nama ?? (!$old || empty($old->notulis_pegawai_id) ? ($old->notulis ?? '') : ''),
+            'notulis_pegawai_id' => $minuteTakerId,
+            'pemateri' => $data['pemateri'] ?? '',
             'agenda' => $data['agenda'] ?? '',
             'link_rekaman' => $canManageRecordings ? ($data['link_rekaman'] ?? null) : ($old->link_rekaman ?? null),
-            'notulen' => $canEditMinutes ? ($data['notulen'] ?? '') : ($old->notulen ?? ''),
+            'notulen' => $old->notulen ?? '',
         ];
         foreach ([
-            'file_notulen' => ['column' => 'file_notulen', 'allowed' => $canEditMinutes],
             'materi_rapat' => ['column' => 'materi_rapat', 'allowed' => $canManageMaterials],
         ] as $input => $filePermission) {
             $column = $filePermission['column'];
@@ -915,7 +1322,16 @@ class PortalController extends Controller
             }
         }
         $participantIds = $request->boolean('semua_pegawai') ? [] : ($data['peserta'] ?? []);
-        DB::transaction(function () use ($old, $id, $values, $participantIds) {
+        $reportChanged = !$old;
+        if ($old) {
+            foreach (['judul', 'tanggal', 'mulai', 'selesai', 'tempat', 'moda', 'link_meeting', 'pimpinan', 'notulis', 'agenda', 'pemateri'] as $field) {
+                if ((string) ($old->$field ?? '') !== (string) ($values[$field] ?? '')) {
+                    $reportChanged = true;
+                    break;
+                }
+            }
+        }
+        $meetingId = DB::transaction(function () use ($old, $id, $values, $participantIds) {
             if ($old) {
                 DB::table('rapat')->where('id', $id)->update($values);
                 $meetingId = $id;
@@ -923,7 +1339,9 @@ class PortalController extends Controller
                 $meetingId = DB::table('rapat')->insertGetId($values);
             }
             $this->saveMeetingParticipants($meetingId, $participantIds);
+            return $meetingId;
         });
+        $this->syncMeetingSignatures($meetingId, $chairId, $minuteTakerId, $reportChanged);
 
         return redirect()->route('admin', 'rapat')->with('status', 'Data rapat berhasil disimpan.');
     }
@@ -999,6 +1417,110 @@ class PortalController extends Controller
         return redirect()->route('admin', ['tab' => 'rapat', 'presensi' => $id])->with('status', 'Pengaturan presensi diperbarui.');
     }
 
+    private function guestAttendanceMeetings()
+    {
+        return DB::table('rapat')
+            ->orderByDesc('tanggal')
+            ->orderByDesc('mulai')
+            ->get()
+            ->filter(fn ($meeting) => (
+                MeetingData::scheduleStatus($meeting) === 'berlangsung'
+                && MeetingData::attendanceOpen($meeting)
+            ) || (
+                MeetingData::scheduleStatus($meeting) !== 'akan'
+                && MeetingData::checkoutOpen($meeting)
+            ))
+            ->values();
+    }
+
+    public function guestAttendanceForm(Request $request)
+    {
+        return view('guest-attendance', [
+            'meetings' => $this->guestAttendanceMeetings(),
+            'selectedMeetingId' => (string) old('meeting_id', $request->query('meeting_id', '')),
+        ]);
+    }
+
+    public function registerGuestAttendance(Request $request)
+    {
+        $data = $request->validate([
+            'meeting_id' => ['required', 'integer', 'exists:rapat,id'],
+            'jenis' => ['required', 'in:tamu,mahasiswa'],
+            'nama' => ['required', 'string', 'max:150'],
+            'asal' => ['required', 'string', 'max:200'],
+            'nim' => ['nullable', 'required_if:jenis,mahasiswa', 'string', 'max:30'],
+            'kode' => ['required', 'string', 'max:20'],
+            'website' => ['nullable', 'string', 'max:0'],
+        ]);
+        $meetingId = (int) $data['meeting_id'];
+        $record = DB::table('rapat')->where('id', $meetingId)->first();
+        abort_unless($record !== null, 404);
+
+        $normalize = static fn (string $value): string => Str::lower(trim((string) preg_replace('/\s+/', ' ', $value)));
+        $identity = $data['jenis'] === 'mahasiswa'
+            ? ['mahasiswa', $normalize($data['nim'])]
+            : ['tamu', $normalize($data['nama']), $normalize($data['asal'])];
+        $identityHash = hash_hmac('sha256', implode('|', $identity), (string) config('app.key'));
+
+        $submittedCode = strtoupper(trim($data['kode']));
+        if (
+            MeetingData::scheduleStatus($record) !== 'akan'
+            && MeetingData::checkoutOpen($record)
+            && hash_equals(strtoupper(trim((string) $record->kode_presensi_pulang)), $submittedCode)
+        ) {
+            $attendance = DB::table('kehadiran_tamu')
+                ->where('rapat_id', $meetingId)
+                ->where('identitas_hash', $identityHash)
+                ->first();
+
+            if (!$attendance) {
+                return back()->withErrors([
+                    'kode' => 'Absen masuk belum ditemukan untuk rapat dan identitas ini. Pastikan rapat, jenis peserta, serta data identitas sama seperti saat absen masuk.',
+                ])->withInput($request->except('kode'));
+            }
+            if ($attendance->waktu_pulang) {
+                return back()->withErrors(['identitas' => 'Absen pulang untuk identitas ini sudah tercatat.'])->withInput($request->except('kode'));
+            }
+
+            $updated = DB::table('kehadiran_tamu')
+                ->where('id', $attendance->id)
+                ->whereNull('waktu_pulang')
+                ->update(['waktu_pulang' => now()]);
+            abort_unless($updated === 1, 409, 'Absen pulang sudah tercatat.');
+
+            return redirect()->route('guest-attendance', ['meeting_id' => $meetingId])
+                ->with('status', 'Absen pulang tamu/mahasiswa berhasil dicatat.');
+        }
+
+        if (
+            MeetingData::scheduleStatus($record) !== 'berlangsung'
+            || !MeetingData::attendanceOpen($record)
+        ) {
+            return back()->withErrors(['kode' => 'Presensi masuk belum dibuka atau batas waktunya telah berakhir.'])->withInput($request->except('kode'));
+        }
+        if (!hash_equals(strtoupper(trim((string) $record->kode_presensi)), $submittedCode)) {
+            return back()->withErrors(['kode' => 'Kode presensi tidak sesuai.'])->withInput($request->except('kode'));
+        }
+
+        $inserted = DB::table('kehadiran_tamu')->insertOrIgnore([
+            'rapat_id' => $meetingId,
+            'jenis' => $data['jenis'],
+            'nama' => trim($data['nama']),
+            'asal' => trim($data['asal']),
+            'nim' => isset($data['nim']) ? trim($data['nim']) : null,
+            'identitas_hash' => $identityHash,
+            'waktu' => now(),
+        ]);
+
+        if ($inserted !== 1) {
+            return back()->withErrors(['identitas' => 'Presensi masuk untuk identitas ini sudah tercatat pada rapat tersebut.'])->withInput($request->except('kode'));
+        }
+
+        return redirect()->route('guest-attendance', ['meeting_id' => $meetingId])
+            ->with('status', 'Absen masuk tamu/mahasiswa berhasil dicatat.')
+            ->withInput($request->only(['meeting_id', 'jenis', 'nama', 'asal', 'nim']));
+    }
+
     public function meeting(Request $request, int $meeting)
     {
         $employee = $this->requireEmployeeOrAdmin();
@@ -1017,6 +1539,7 @@ class PortalController extends Controller
         $canManageMaterials = $canManageMeetingContent && ($isSuperAdmin || $permissions['materi']);
         $canManageRecordings = $canManageMeetingContent && ($isSuperAdmin || $permissions['rekaman']);
         $canViewAttendance = !$employee && ($isSuperAdmin || $permissions['lihat_daftar_hadir']);
+        $canExportMeetingReport = $admin && ($isSuperAdmin || $permissions['lihat_daftar_hadir']);
         $employeeAttendanceOnly = $employee
             && MeetingData::scheduleStatus($record) === 'berlangsung';
         $attendees = DB::table('kehadiran as k')->join('pegawai as p', 'p.id', '=', 'k.pegawai_id')
@@ -1032,10 +1555,15 @@ class PortalController extends Controller
             'showMeetingAdminTools' => $showMeetingAdminTools,
             'employeeAttendanceOnly' => $employeeAttendanceOnly,
             'attendance' => $attendance,
+            'guestAttendees' => DB::table('kehadiran_tamu')
+                ->where('rapat_id', $meeting)
+                ->orderBy('waktu')
+                ->get(),
             'canEditMinutes' => $canEditMinutes,
             'canManageMaterials' => $canManageMaterials,
             'canManageRecordings' => $canManageRecordings,
             'canViewAttendance' => $canViewAttendance,
+            'canExportMeetingReport' => $canExportMeetingReport,
             'canAccessAdminMenu' => $isSuperAdmin
                 || ($this->isEmployeeAdmin($employee) && in_array(session('active_role'), ['admin', 'super_admin'], true)),
             'canManageRoles' => $isSuperAdmin,
@@ -1063,7 +1591,7 @@ class PortalController extends Controller
         $attendanceOnly = $employee && MeetingData::scheduleStatus($record) === 'berlangsung';
         $action = $request->string('aksi')->toString();
         $permissions = $this->superAdminPermissions($employee ?: null);
-        $allowedActionsDuringMeeting = ['hadir', 'absen_pulang'];
+        $allowedActionsDuringMeeting = ['hadir', 'absen_pulang', 'simpan_alasan_pulang'];
         if ($isSuperAdmin || $permissions['notulen']) {
             $allowedActionsDuringMeeting[] = 'simpan_notulen';
         }
@@ -1083,12 +1611,15 @@ class PortalController extends Controller
 
         if ($action === 'hadir') {
             abort_unless($employee && !$attendance, 403);
+            if (MeetingData::scheduleStatus($record) !== 'berlangsung') {
+                return back()->withErrors(['presensi' => 'Absen hadir hanya tersedia saat rapat berlangsung.']);
+            }
             $data = $request->validate(['kode' => ['required', 'string', 'max:15']]);
             if (!MeetingData::attendanceOpen($record)) {
-                return back()->withErrors(['presensi' => 'Presensi belum dibuka atau batas waktunya telah berakhir.']);
+                return back()->withErrors(['presensi' => 'Kode presensi hadir belum dibuka atau masa berlakunya telah berakhir.']);
             }
-            if (strtoupper(trim($data['kode'])) !== strtoupper(trim($record->kode_presensi))) {
-                return back()->withErrors(['presensi' => 'Kode presensi tidak sesuai.']);
+            if (!hash_equals(strtoupper(trim((string) $record->kode_presensi)), strtoupper(trim($data['kode'])))) {
+                return back()->withErrors(['presensi' => 'Kode presensi hadir tidak sesuai.']);
             }
             $sessionKey = 'attendance_device_'.$meeting;
             if (session()->has($sessionKey) && session($sessionKey) != $employee->id) {
@@ -1135,11 +1666,15 @@ class PortalController extends Controller
                     && !$attendance->waktu_pulang,
                 403
             );
-            $data = $request->validate(['kode' => ['required', 'string', 'max:20']]);
-            if (!MeetingData::checkoutOpen($record)) {
-                return back()->withErrors(['presensi_pulang' => 'Kode absen pulang belum dibuka atau waktunya sudah berakhir.']);
+            $scheduleStatus = MeetingData::scheduleStatus($record);
+            if (
+                $scheduleStatus === 'akan'
+                || !MeetingData::checkoutOpen($record)
+            ) {
+                return back()->withErrors(['presensi_pulang' => 'Kode absen pulang belum dibuka atau masa berlakunya telah berakhir.']);
             }
-            if (strtoupper(trim($data['kode'])) !== strtoupper(trim($record->kode_presensi_pulang))) {
+            $data = $request->validate(['kode' => ['required', 'string', 'max:20']]);
+            if (!hash_equals(strtoupper(trim((string) $record->kode_presensi_pulang)), strtoupper(trim($data['kode'])))) {
                 return back()->withErrors(['presensi_pulang' => 'Kode absen pulang tidak sesuai.']);
             }
             $updated = DB::table('kehadiran')->where('id', $attendance->id)->whereNull('waktu_pulang')
@@ -1152,17 +1687,39 @@ class PortalController extends Controller
             abort_unless(
                 $employee
                     && $attendance
-                    && $attendance->status === 'hadir'
-                    && !$attendance->waktu_pulang
-                    && MeetingData::scheduleStatus($record) === 'selesai',
+                    && $attendance->status === 'hadir',
                 403
             );
+            if ($attendance->waktu_pulang) {
+                return back()->withErrors([
+                    'alasan_pulang' => 'Alasan tidak dapat disimpan karena absen pulang sudah tercatat.',
+                ]);
+            }
             $data = $request->validate(['alasan_pulang' => ['required', 'string', 'max:2000']]);
-            DB::table('kehadiran')->where('id', $attendance->id)->whereNull('waktu_pulang')->update([
-                'alasan_pulang' => trim($data['alasan_pulang']),
+            $reason = trim($data['alasan_pulang']);
+            $updated = DB::table('kehadiran')->where('id', $attendance->id)
+                ->where('status', 'hadir')->whereNull('waktu_pulang')->update([
+                'alasan_pulang' => $reason,
             ]);
+            if ($updated !== 1) {
+                $currentAttendance = DB::table('kehadiran')->where('id', $attendance->id)->first();
+                if (
+                    $currentAttendance
+                    && $currentAttendance->status === 'hadir'
+                    && !$currentAttendance->waktu_pulang
+                    && $currentAttendance->alasan_pulang === $reason
+                ) {
+                    return back()->with('status', 'Alasan pulang lebih awal berhasil disimpan.');
+                }
 
-            return back()->with('status', 'Keterangan absen pulang berhasil disimpan.');
+                return back()->withErrors([
+                    'alasan_pulang' => $currentAttendance && $currentAttendance->waktu_pulang
+                        ? 'Alasan tidak dapat disimpan karena absen pulang sudah tercatat.'
+                        : 'Alasan pulang gagal disimpan. Silakan coba kembali.',
+                ]);
+            }
+
+            return back()->with('status', 'Alasan pulang lebih awal berhasil disimpan.');
         }
 
         if ($action === 'izin') {

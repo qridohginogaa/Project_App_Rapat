@@ -77,6 +77,7 @@ a {
 
 .calendar-heading {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 12px
@@ -138,18 +139,86 @@ button.calendar-day {
     content: ""
 }
 
+.calendar-day.has-national-holiday {
+    background: #fff1f2;
+    color: #b3261e;
+    font-weight: 800
+}
+
+.calendar-day.has-national-holiday::after {
+    background: #e11d48
+}
+
+.calendar-day.has-collective-leave {
+    background: #fffbeb;
+    color: #a16207;
+    font-weight: 800
+}
+
+.calendar-day.has-collective-leave::after {
+    background: #f59e0b
+}
+
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-top: 12px;
+    color: #64748b;
+    font-size: 11px
+}
+
+.calendar-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px
+}
+
+.calendar-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%
+}
+
+.calendar-legend-holiday {
+    background: #e11d48
+}
+
+.calendar-legend-collective {
+    background: #f59e0b
+}
+
+.calendar-legend-meeting {
+    background: var(--teal)
+}
+
 .calendar-events {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 14px;
     margin-top: 14px;
-    color: var(--mu);
+    color: #64748b;
     font-size: 13px
 }
 
 .calendar-events b {
     width: 100%;
     color: var(--tx)
+}
+
+.calendar-holiday-item.is-national {
+    color: #be123c
+}
+
+.calendar-holiday-item.is-collective {
+    color: #a16207
+}
+
+.calendar-source {
+    display: block;
+    margin-top: 10px;
+    color: #64748b;
+    font-size: 10px
 }
 
 @media (max-width: 600px) {

@@ -92,6 +92,266 @@ class PortalTest extends TestCase
         );
     }
 
+    public function test_dashboard_calendar_includes_official_national_holidays_and_collective_leave(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('id="calendar-title" class="mt-0">Kalender rapat</h2>', false)
+            ->assertSee('Libur nasional')
+            ->assertSee('Cuti bersama')
+            ->assertSee('has-national-holiday')
+            ->assertSee('has-collective-leave')
+            ->assertSee('2026-03-19')
+            ->assertSee('Hari Suci Nyepi (Tahun Baru Saka 1948)')
+            ->assertSee('2027-12-26')
+            ->assertSee('Isra Mikraj Nabi Muhammad saw.')
+            ->assertSee('https://setneg.go.id/baca/index/inilah_skb_3_menteri_libur_nasional_dan_cuti_bersama_2026');
+    }
+
+    public function test_dashboard_offers_guest_attendance_for_an_active_meeting(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat untuk presensi tamu',
+            'tanggal' => now()->toDateString(),
+            'mulai' => now()->subMinutes(30)->format('H:i:s'),
+            'selesai' => now()->addMinutes(30)->format('H:i:s'),
+            'moda' => 'Luring',
+            'kode_presensi' => 'TAMU42',
+            'presensi_kedaluwarsa' => now()->addMinutes(15),
+        ]);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Presensi Tamu & Mahasiswa')
+            ->assertSee('FORMULIR ONLINE')
+            ->assertSee('Isi presensi')
+            ->assertSee(route('guest-attendance'));
+
+        $this->get(route('guest-attendance'))
+            ->assertOk()
+            ->assertSee('Presensi Tamu & Mahasiswa')
+            ->assertSee('Rapat untuk presensi tamu')
+            ->assertSee('Mahasiswa')
+            ->assertSee('Rapat yang dihadiri')
+            ->assertSee('Kode presensi')
+            ->assertSee('name="meeting_id"', false);
+    }
+
+    public function test_dashboard_hides_guest_attendance_link_for_logged_in_accounts(): void
+    {
+        $passwordHash = Hash::make('pegawai-password');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Tes',
+            'jabatan' => 'Pegawai',
+            'password_hash' => $passwordHash,
+        ]);
+
+        $this->withSession([
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+            'active_role' => 'pegawai',
+        ])->get('/')
+            ->assertOk()
+            ->assertDontSee('Presensi Tamu & Mahasiswa')
+            ->assertDontSee(route('guest-attendance'));
+
+        $this->withSession(['admin_id' => 1])->get('/')
+            ->assertOk()
+            ->assertDontSee('Presensi Tamu & Mahasiswa')
+            ->assertDontSee(route('guest-attendance'));
+    }
+
+    public function test_guest_attendance_form_stays_visible_when_no_meeting_is_open(): void
+    {
+        $this->get(route('guest-attendance'))
+            ->assertOk()
+            ->assertSee('Belum ada rapat yang membuka presensi')
+            ->assertSee('name="nama"', false)
+            ->assertSee('name="asal"', false)
+            ->assertSee('name="jenis"', false)
+            ->assertSee('name="kode"', false)
+            ->assertSee('Kode presensi hadir / pulang')
+            ->assertSee('name="meeting_id" required disabled', false)
+            ->assertSee('type="submit" disabled', false);
+    }
+
+    public function test_guest_attendance_is_recorded_separately_and_rejects_duplicate_identity(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat presensi tamu',
+            'tanggal' => now()->toDateString(),
+            'mulai' => now()->subMinutes(30)->format('H:i:s'),
+            'selesai' => now()->addMinutes(30)->format('H:i:s'),
+            'moda' => 'Luring',
+            'kode_presensi' => 'TAMU42',
+            'presensi_kedaluwarsa' => now()->addMinutes(15),
+        ]);
+
+        $payload = [
+            'meeting_id' => $meetingId,
+            'jenis' => 'tamu',
+            'nama' => '  Budi   Santoso ',
+            'asal' => 'Poltekkes Manado',
+            'kode' => 'tamu42',
+            'website' => '',
+        ];
+
+        $this->post(route('guest-attendance.store'), $payload)
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertSessionHas('status', 'Absen masuk tamu/mahasiswa berhasil dicatat.');
+
+        $this->assertDatabaseHas('kehadiran_tamu', [
+            'rapat_id' => $meetingId,
+            'jenis' => 'tamu',
+            'nama' => 'Budi   Santoso',
+            'asal' => 'Poltekkes Manado',
+            'nim' => null,
+        ]);
+        $this->assertDatabaseCount('kehadiran', 0);
+
+        $this->from(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->post(route('guest-attendance.store'), [
+                ...$payload,
+                'nama' => 'budi santoso',
+                'asal' => ' poltekkes   manado ',
+            ])
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertSessionHasErrors('identitas');
+
+        $this->assertDatabaseCount('kehadiran_tamu', 1);
+        $this->withSession(['admin_id' => 1])->get('/admin/rapat')
+            ->assertOk()
+            ->assertSee('Presensi tamu / mahasiswa')
+            ->assertSee('Budi   Santoso')
+            ->assertSee('Poltekkes Manado');
+    }
+
+    public function test_student_guest_attendance_requires_nim_and_rejects_wrong_code(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat mahasiswa',
+            'tanggal' => now()->toDateString(),
+            'mulai' => now()->subMinutes(30)->format('H:i:s'),
+            'selesai' => now()->addMinutes(30)->format('H:i:s'),
+            'moda' => 'Luring',
+            'kode_presensi' => 'TAMU42',
+            'presensi_kedaluwarsa' => now()->addMinutes(15),
+        ]);
+
+        $payload = [
+            'meeting_id' => $meetingId,
+            'jenis' => 'mahasiswa',
+            'nama' => 'Mahasiswa Tes',
+            'asal' => 'Keperawatan',
+            'kode' => 'SALAH',
+        ];
+
+        $this->from(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->post(route('guest-attendance.store'), $payload)
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertSessionHasErrors('nim');
+
+        $this->from(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->post(route('guest-attendance.store'), [
+                ...$payload,
+                'nim' => '20260001',
+            ])
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertSessionHasErrors('kode');
+
+        $this->assertDatabaseCount('kehadiran_tamu', 0);
+    }
+
+    public function test_student_nim_prevents_duplicate_guest_attendance(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat mahasiswa unik',
+            'tanggal' => now()->toDateString(),
+            'mulai' => now()->subMinutes(30)->format('H:i:s'),
+            'selesai' => now()->addMinutes(30)->format('H:i:s'),
+            'moda' => 'Luring',
+            'kode_presensi' => 'TAMU42',
+            'presensi_kedaluwarsa' => now()->addMinutes(15),
+        ]);
+        $payload = [
+            'meeting_id' => $meetingId,
+            'jenis' => 'mahasiswa',
+            'nama' => 'Mahasiswa Pertama',
+            'asal' => 'Keperawatan',
+            'nim' => '20260001',
+            'kode' => 'TAMU42',
+        ];
+
+        $this->post(route('guest-attendance.store'), $payload)
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]));
+        $this->from(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->post(route('guest-attendance.store'), [
+                ...$payload,
+                'nama' => 'Nama Berbeda',
+                'asal' => 'Program Studi Berbeda',
+            ])
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertSessionHasErrors('identitas');
+
+        $this->assertDatabaseCount('kehadiran_tamu', 1);
+    }
+
+    public function test_guest_uses_the_same_form_to_record_check_in_and_check_out(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat presensi masuk dan pulang',
+            'tanggal' => now()->toDateString(),
+            'mulai' => now()->subMinutes(30)->format('H:i:s'),
+            'selesai' => now()->addMinutes(30)->format('H:i:s'),
+            'moda' => 'Luring',
+            'kode_presensi' => 'MASUK42',
+            'presensi_kedaluwarsa' => now()->addMinutes(15),
+            'kode_presensi_pulang' => 'PULANG42',
+            'presensi_pulang_kedaluwarsa' => now()->addHour(),
+        ]);
+        $payload = [
+            'meeting_id' => $meetingId,
+            'jenis' => 'mahasiswa',
+            'nama' => 'Mahasiswa Pulang',
+            'asal' => 'Keperawatan',
+            'nim' => '20260042',
+        ];
+
+        $this->post(route('guest-attendance.store'), [...$payload, 'kode' => 'MASUK42'])
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertSessionHas('status', 'Absen masuk tamu/mahasiswa berhasil dicatat.');
+
+        $this->get(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertOk()
+            ->assertSee('Absen masuk sudah tercatat')
+            ->assertSee('value="Mahasiswa Pulang"', false)
+            ->assertSee('value="Keperawatan"', false)
+            ->assertSee('value="20260042"', false)
+            ->assertSee('value="'.$meetingId.'" selected', false);
+
+        DB::table('rapat')->where('id', $meetingId)->update([
+            'ended_at' => now(),
+            'presensi_kedaluwarsa' => now()->subMinute(),
+        ]);
+
+        $this->get(route('guest-attendance'))
+            ->assertOk()
+            ->assertSee('Rapat presensi masuk dan pulang')
+            ->assertSee('Absen pulang dibuka');
+
+        $this->post(route('guest-attendance.store'), [...$payload, 'kode' => 'PULANG42'])
+            ->assertRedirect(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertSessionHas('status', 'Absen pulang tamu/mahasiswa berhasil dicatat.');
+
+        $this->assertDatabaseHas('kehadiran_tamu', [
+            'rapat_id' => $meetingId,
+            'nim' => '20260042',
+        ]);
+        $this->assertNotNull(DB::table('kehadiran_tamu')->where('rapat_id', $meetingId)->value('waktu_pulang'));
+        $this->assertDatabaseCount('kehadiran_tamu', 1);
+    }
+
     public function test_login_page_is_separate_from_the_dashboard(): void
     {
         $this->get('/login')
@@ -197,18 +457,38 @@ class PortalTest extends TestCase
             'alasan' => 'Demam',
             'status_izin' => 'menunggu',
         ]);
+        DB::table('kehadiran_tamu')->insert([
+            'rapat_id' => $meetingId,
+            'jenis' => 'mahasiswa',
+            'nama' => 'Mahasiswa Presensi Terpisah',
+            'asal' => 'Poltekkes Manado',
+            'nim' => '20260099',
+            'identitas_hash' => str_repeat('a', 64),
+            'waktu' => now()->subDay()->setTime(9, 10),
+        ]);
 
         $attendancePage = $this->withSession(['admin_id' => 1])->get('/admin/kehadiran')
             ->assertOk()
             ->assertSee('Presensi rapat selesai')
+            ->assertSee('Buka rapat, lalu pilih jenis presensi pegawai atau tamu/mahasiswa.')
+            ->assertSee('data-attendance-type-select', false)
+            ->assertSee('Pegawai (1)')
+            ->assertSee('Tamu / Mahasiswa (1)')
+            ->assertSee('Instansi / program studi')
             ->assertSee('Keterangan tidak absen pulang')
-            ->assertSee('Rapat Selesai Untuk Ditinjau · '.\App\Support\MeetingData::date(now()->subDay()->toDateString()).' · 1 hadir')
+            ->assertSee('Rapat Selesai Untuk Ditinjau')
+            ->assertSee('1 pegawai')
+            ->assertSee('1 tamu/mahasiswa')
             ->assertSee('Hadir Rapat Selesai')
             ->assertSee('123456789012345678')
+            ->assertSee('Mahasiswa Presensi Terpisah')
+            ->assertSee('Poltekkes Manado')
+            ->assertSee('20260099')
             ->assertSee('Daftar izin rapat')
             ->assertSee('Izin Rapat Selesai')
             ->assertSee('Izin menunggu')
-            ->assertSee('Sakit: Demam')
+            ->assertSee('Sakit')
+            ->assertSee('Demam')
             ->assertSee('Setujui')
             ->assertSee('Tolak')
             ->assertDontSee('Catatan kehadiran &amp; izin')
@@ -330,13 +610,14 @@ class PortalTest extends TestCase
 
         $html = $this->withSession(['admin_id' => 1])->get('/admin/rapat')
             ->assertOk()
-            ->assertSee('Cari rapat selesai')
+            ->assertSee('Cari judul, tanggal, atau tempat rapat...')
             ->assertSee('data-admin-completed-search', false)
-            ->assertSee('Tampilkan rapat selesai lainnya (2)')
+            ->assertSee('Tampilkan 2 rapat selesai lainnya')
             ->assertSee('Rapat mendatang tetap terlihat')
             ->getContent();
 
-        $this->assertSame(4, substr_count($html, 'class="hidden" hidden'));
+        preg_match_all('/<article[^>]*data-completed-index="(?:5|6)"[^>]*\shidden(?:\s|>)[^>]*>/s', $html, $collapsedMeetings);
+        $this->assertCount(2, $collapsedMeetings[0]);
     }
 
     public function test_regular_employee_can_search_completed_meetings_from_the_dashboard(): void
@@ -379,12 +660,313 @@ class PortalTest extends TestCase
 
         $html = $this->withSession(['admin_id' => 1])->get('/admin/kehadiran')
             ->assertOk()
-            ->assertSee('Tampilkan rapat selesai lainnya (2)')
+            ->assertSee('Tampilkan lainnya')
+            ->assertSee('+2')
             ->getContent();
 
-        $this->assertSame(2, substr_count($html, 'class="box mt-2 hidden" data-completed-attendance-meeting hidden'));
-        $this->assertStringContainsString('<summary>Presensi rapat selesai 1', $html);
+        $this->assertSame(2, substr_count($html, 'class="attendance-meeting-card hidden" data-completed-attendance-meeting hidden'));
+        $this->assertStringContainsString('Presensi rapat selesai 1', $html);
         $this->assertStringContainsString('Presensi rapat selesai 5', $html);
+    }
+
+    public function test_completed_meeting_attendance_can_be_exported_to_excel_for_each_attendance_type(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Rekap Presensi',
+            'tanggal' => now()->subDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Ekspor',
+            'jabatan' => 'Staf',
+            'password_hash' => Hash::make('password-tes'),
+        ]);
+        DB::table('kehadiran')->insert([
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $employeeId,
+            'status' => 'hadir',
+            'waktu' => now()->subDay()->setTime(9, 5),
+            'alasan_pulang' => 'Keperluan <keluarga> & lainnya',
+        ]);
+        DB::table('kehadiran_tamu')->insert([
+            'rapat_id' => $meetingId,
+            'jenis' => 'mahasiswa',
+            'nama' => 'Mahasiswa Ekspor',
+            'asal' => 'Poltekkes Manado',
+            'nim' => 'MHS001',
+            'identitas_hash' => hash('sha256', 'MHS001'),
+            'waktu' => now()->subDay()->setTime(9, 10),
+        ]);
+
+        $meetingManagerId = DB::table('pegawai')->insertGetId([
+            'nip' => '876543210987654321',
+            'nama' => 'Pengelola Tanpa Akses Presensi',
+            'jabatan' => 'Pengelola',
+            'password_hash' => Hash::make('password-tes'),
+        ]);
+        DB::table('admin_pegawai')->insert(['pegawai_id' => $meetingManagerId]);
+        $this->withSession([
+            'employee_id' => $meetingManagerId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $meetingManagerId)->value('password_hash'),
+            'active_role' => 'admin',
+        ])->get(route('admin.attendance.export', [$meetingId, 'pegawai']))
+            ->assertForbidden();
+
+        $this->get(route('admin.attendance.export', [$meetingId, 'pegawai']))
+            ->assertForbidden();
+
+        $this->withSession(['admin_id' => 1])->get('/admin/kehadiran')
+            ->assertOk()
+            ->assertSee(route('admin.attendance.export', [$meetingId, 'pegawai']))
+            ->assertSee(route('admin.attendance.export', [$meetingId, 'tamu']))
+            ->assertSee('Ekspor Excel pegawai')
+            ->assertSee('Ekspor Excel tamu/mahasiswa');
+
+        $employeeExport = $this->withSession(['admin_id' => 1])
+            ->get(route('admin.attendance.export', [$meetingId, 'pegawai']));
+        $employeeExport->assertOk()
+            ->assertDownload('rapat-rekap-presensi-presensi-pegawai.xls')
+            ->assertHeader('Content-Type', 'application/vnd.ms-excel; charset=UTF-8');
+        $this->assertStringContainsString('Nama', $employeeExport->streamedContent());
+        $this->assertStringContainsString('Pegawai Ekspor', $employeeExport->streamedContent());
+        $this->assertStringContainsString('Keperluan &lt;keluarga&gt; &amp; lainnya', $employeeExport->streamedContent());
+
+        $guestExport = $this->withSession(['admin_id' => 1])
+            ->get(route('admin.attendance.export', [$meetingId, 'tamu']));
+        $guestExport->assertOk()->assertDownload('rapat-rekap-presensi-presensi-tamu.xls');
+        $this->assertStringContainsString('Mahasiswa Ekspor', $guestExport->streamedContent());
+        $this->assertStringContainsString('Poltekkes Manado', $guestExport->streamedContent());
+        $this->assertStringContainsString('Belum absen pulang', $guestExport->streamedContent());
+    }
+
+    public function test_meeting_pdf_is_available_after_both_signers_approve_the_latest_minutes(): void
+    {
+        $chairPasswordHash = Hash::make('password-pimpinan');
+        $chairId = DB::table('pegawai')->insertGetId([
+            'nip' => '111111111111111111',
+            'nama' => 'Pimpinan Tes',
+            'jabatan' => 'Dosen',
+            'password_hash' => $chairPasswordHash,
+        ]);
+        $minuteTakerPasswordHash = Hash::make('password-notulis');
+        $minuteTakerId = DB::table('pegawai')->insertGetId([
+            'nip' => '222222222222222222',
+            'nama' => 'Notulis Tes',
+            'jabatan' => 'Dosen',
+            'password_hash' => $minuteTakerPasswordHash,
+        ]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Format Contoh',
+            'tanggal' => now()->subDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'tempat' => 'Ruang Bunaken',
+            'moda' => 'Luring',
+            'pimpinan_pegawai_id' => $chairId,
+            'pimpinan' => 'Pimpinan Tes',
+            'notulis_pegawai_id' => $minuteTakerId,
+            'notulis' => 'Notulis Tes',
+            'agenda' => 'Evaluasi layanan',
+            'notulen' => 'Pembahasan <penting> & tindak lanjut.',
+        ]);
+        $attendeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '333333333333333333',
+            'nama' => 'Pegawai Dokumen',
+            'jabatan' => 'Dosen',
+        ]);
+        DB::table('kehadiran')->insert([
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $attendeeId,
+            'status' => 'hadir',
+            'waktu' => now()->subDay()->setTime(9, 5),
+        ]);
+        DB::table('kehadiran_tamu')->insert([
+            'rapat_id' => $meetingId,
+            'jenis' => 'mahasiswa',
+            'nama' => 'Mahasiswa Dokumen',
+            'asal' => 'Jurusan Kesehatan',
+            'nim' => 'MHS002',
+            'identitas_hash' => hash('sha256', 'MHS002'),
+            'waktu' => now()->subDay()->setTime(9, 10),
+        ]);
+        DB::table('penugasan')->insert([
+            'rapat_id' => $meetingId,
+            'nama_petugas' => 'PIC Rapat',
+            'tugas' => 'Menindaklanjuti evaluasi',
+            'deadline' => now()->addDays(2)->toDateString(),
+            'status' => 'Belum Selesai',
+        ]);
+        foreach ([
+            ['pegawai_id' => $chairId, 'peran' => 'pimpinan', 'token' => str_repeat('a', 64)],
+            ['pegawai_id' => $minuteTakerId, 'peran' => 'notulis', 'token' => str_repeat('b', 64)],
+        ] as $signature) {
+            DB::table('meeting_signatures')->insert([
+                'rapat_id' => $meetingId,
+                ...$signature,
+                'status' => 'menunggu',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $route = route('meetings.report.export', $meetingId);
+        $this->get($route)->assertForbidden();
+        $this->withSession(['admin_id' => 1])->get('/admin/rapat')
+            ->assertOk()
+            ->assertSee($route)
+            ->assertSee('Unduh PDF Notulen + Daftar Hadir');
+        $this->withSession(['admin_id' => 1])->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee($route);
+
+        $this->withSession(['admin_id' => 1])->get($route)
+            ->assertRedirect()
+            ->assertSessionHasErrors('tanda_tangan');
+
+        $chairSession = [
+            'employee_id' => $chairId,
+            'employee_password_hash' => $chairPasswordHash,
+            'active_role' => 'pegawai',
+        ];
+        $minuteTakerSession = [
+            'employee_id' => $minuteTakerId,
+            'employee_password_hash' => $minuteTakerPasswordHash,
+            'active_role' => 'pegawai',
+        ];
+        $this->withSession($chairSession)->get(route('signatures.index'))
+            ->assertOk()
+            ->assertSee('Rapat Format Contoh')
+            ->assertSee('PIMPINAN RAPAT')
+            ->assertSee('Terima & setujui');
+        $this->withSession($chairSession)->post(route('signatures.accept', [$meetingId, 'pimpinan']))
+            ->assertRedirect(route('signatures.index'));
+        $this->withSession($minuteTakerSession)->post(route('signatures.accept', [$meetingId, 'notulis']))
+            ->assertRedirect(route('signatures.index'));
+
+        $this->get(route('signatures.verify', str_repeat('a', 64)))
+            ->assertOk()
+            ->assertSee('Notulen Rapat Terverifikasi')
+            ->assertSee('Pimpinan Tes')
+            ->assertSee('NIP 111111111111111111')
+            ->assertSee('TANGGAL KONFIRMASI TANDA TANGAN')
+            ->assertSee('RAPAT YANG DIKONFIRMASI')
+            ->assertSee('AAAA-AAAA-AAAA');
+
+        $download = $this->withSession(['admin_id' => 1])->get($route);
+        $download->assertOk()
+            ->assertDownload('rapat-format-contoh-notulen-daftar-hadir.pdf')
+            ->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $download->streamedContent());
+
+        DB::table('rapat')->where('id', $meetingId)->update([
+            'notulen' => 'Notulen telah diperbarui setelah persetujuan.',
+        ]);
+        $this->get(route('signatures.verify', str_repeat('a', 64)))
+            ->assertOk()
+            ->assertSee('Persetujuan Tidak Terverifikasi')
+            ->assertSee('QR tidak cocok dengan persetujuan aktif');
+        $this->withSession($chairSession)->get(route('signatures.index'))
+            ->assertOk()
+            ->assertSee('Menunggu persetujuan');
+    }
+
+    public function test_new_admin_meeting_creates_signature_requests_for_selected_employees(): void
+    {
+        $chairId = DB::table('pegawai')->insertGetId([
+            'nip' => '444444444444444444',
+            'nama' => 'Pimpinan Baru',
+            'jabatan' => 'Dosen',
+        ]);
+        $minuteTakerId = DB::table('pegawai')->insertGetId([
+            'nip' => '555555555555555555',
+            'nama' => 'Notulis Baru',
+            'jabatan' => 'Dosen',
+        ]);
+
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'simpan_rapat',
+            'id' => 0,
+            'judul' => 'Rapat Dengan Penanda Tangan',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+            'pimpinan_pegawai_id' => $chairId,
+            'notulis_pegawai_id' => $minuteTakerId,
+            'semua_pegawai' => 1,
+        ])->assertRedirect(route('admin', 'rapat'));
+
+        $meetingId = DB::table('rapat')->where('judul', 'Rapat Dengan Penanda Tangan')->value('id');
+        $this->assertNotNull($meetingId);
+        $this->assertDatabaseHas('meeting_signatures', [
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $chairId,
+            'peran' => 'pimpinan',
+            'status' => 'menunggu',
+        ]);
+        $this->assertDatabaseHas('meeting_signatures', [
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $minuteTakerId,
+            'peran' => 'notulis',
+            'status' => 'menunggu',
+        ]);
+    }
+
+    public function test_signature_notifications_show_before_meeting_is_ready_for_approval(): void
+    {
+        $passwordHash = Hash::make('password-penanda-tangan');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '666666666666666666',
+            'nama' => 'Pegawai Penanda Tangan',
+            'jabatan' => 'Dosen',
+            'password_hash' => $passwordHash,
+        ]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Sedang Berlangsung',
+            'tanggal' => now()->toDateString(),
+            'mulai' => now()->subHour()->format('H:i:s'),
+            'selesai' => now()->addHour()->format('H:i:s'),
+            'moda' => 'Luring',
+            'pimpinan' => 'Pegawai Penanda Tangan',
+            'notulis' => 'Pegawai Penanda Tangan',
+            'pimpinan_pegawai_id' => $employeeId,
+            'notulis_pegawai_id' => $employeeId,
+            'notulen' => '',
+        ]);
+
+        foreach (['pimpinan', 'notulis'] as $index => $role) {
+            DB::table('meeting_signatures')->insert([
+                'rapat_id' => $meetingId,
+                'pegawai_id' => $employeeId,
+                'peran' => $role,
+                'token' => str_repeat((string) ($index + 1), 64),
+                'status' => 'menunggu',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+            'active_role' => 'pegawai',
+        ];
+        $this->withSession($session)->get(route('signatures.index'))
+            ->assertOk()
+            ->assertSee('2 notifikasi menunggu')
+            ->assertSee('Rapat Sedang Berlangsung')
+            ->assertSee('PIMPINAN RAPAT')
+            ->assertSee('NOTULIS')
+            ->assertSee('Menunggu rapat selesai')
+            ->assertDontSee('Terima &amp; setujui');
+
+        $this->withSession($session)->get('/')
+            ->assertOk()
+            ->assertSee('signature-nav-count')
+            ->assertSee('>2</span>', false);
     }
 
     public function test_employee_can_sign_in_with_their_existing_password_hash(): void
@@ -956,7 +1538,7 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('Pegawai Admin')
             ->assertSee('(Pengelola Rapat)')
-            ->assertSee('admin-menu-toggle')
+            ->assertSee('aria-label="Fitur Pengelola Rapat"', false)
             ->assertSee(route('admin', 'rapat'))
             ->assertDontSee('Dashboard Pengelola Rapat')
             ->assertDontSee('Beralih ke mode Pegawai');
@@ -965,13 +1547,15 @@ class PortalTest extends TestCase
             ->assertSee('Rapat')
             ->assertSee('Pegawai Admin')
             ->assertSee('(Pengelola Rapat)')
-            ->assertSee('Kembali ke Dashboard')
+            ->assertSee('logo-home-link')
+            ->assertSee('aria-label="Kembali ke Dashboard"', false)
             ->assertSee(route('dashboard'));
         $this->get('/admin/kehadiran')
             ->assertOk()
             ->assertSee('Pegawai Admin')
             ->assertSee('(Pengelola Rapat)')
-            ->assertSee('Kembali ke Dashboard');
+            ->assertSee('logo-home-link')
+            ->assertSee('aria-label="Kembali ke Dashboard"', false);
         $this->get('/admin/pegawai')->assertForbidden();
 
         $this->post('/role/switch', ['role' => 'pegawai'])->assertRedirect('/');
@@ -1012,7 +1596,8 @@ class PortalTest extends TestCase
                 $this->withSession($adminSession)
                     ->get(route('admin', $tab))
                     ->assertOk()
-                    ->assertSee('Kembali ke Dashboard')
+                    ->assertSee('logo-home-link')
+                    ->assertSee('aria-label="Kembali ke Dashboard"', false)
                     ->assertSee(route('dashboard'));
             }
         }
@@ -1039,7 +1624,7 @@ class PortalTest extends TestCase
             'judul' => 'Rapat Diakhiri Manual',
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subMinutes(20)->format('H:i'),
-            'selesai' => now()->subMinutes(5)->format('H:i'),
+            'selesai' => now()->addMinutes(10)->format('H:i'),
             'moda' => 'Luring',
             'kode_presensi' => 'MASUK8',
             'presensi_kedaluwarsa' => now()->addMinutes(20),
@@ -1055,6 +1640,19 @@ class PortalTest extends TestCase
             'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
             'active_role' => 'super_admin',
         ];
+
+        $this->withSession($session)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('Perlu pulang lebih awal?')
+            ->assertSee('Isi alasan pulang lebih awal');
+        $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_alasan_pulang',
+            'alasan_pulang' => 'Ada keperluan keluarga.',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('kehadiran', [
+            'id' => $attendanceId,
+            'alasan_pulang' => 'Ada keperluan keluarga.',
+        ]);
 
         $this->withSession($session)->get('/')
             ->assertOk()
@@ -1072,27 +1670,25 @@ class PortalTest extends TestCase
 
         $this->withSession($session)->get('/meetings/'.$meetingId)
             ->assertOk()
-            ->assertSee('Belum Absen Pulang')
-            ->assertSee('Keterangan / alasan tidak mengisi absen pulang')
-            ->assertSee('Alasan pulang duluan');
+            ->assertSee('Alasan pulang lebih awal / belum absen pulang')
+            ->assertSee('Alasan tersimpan: Ada keperluan keluarga.');
         $this->withSession(['admin_id' => 1])->get('/admin/rapat?presensi='.$meetingId)
             ->assertOk()
             ->assertSee('Kode absen pulang aktif')
             ->assertSee('Tutup kode absen pulang')
             ->assertSee('Buat kode absen pulang');
+        $this->withSession(['admin_id' => 1])->get('/admin/kehadiran')
+            ->assertOk()
+            ->assertSee('Pulang lebih awal')
+            ->assertSee('Ada keperluan keluarga.');
+
+        DB::table('kehadiran')->where('id', $attendanceId)->update(['waktu_pulang' => now()]);
         $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'simpan_alasan_pulang',
             'alasan_pulang' => 'Ada keperluan keluarga.',
-        ])->assertRedirect();
-        $this->assertDatabaseHas('kehadiran', [
-            'id' => $attendanceId,
-            'alasan_pulang' => 'Ada keperluan keluarga.',
+        ])->assertRedirect()->assertSessionHasErrors([
+            'alasan_pulang' => 'Alasan tidak dapat disimpan karena absen pulang sudah tercatat.',
         ]);
-
-        $this->withSession(['admin_id' => 1])->get('/admin/kehadiran')
-            ->assertOk()
-            ->assertSee('Belum Absen Pulang')
-            ->assertSee('Ada keperluan keluarga.');
     }
 
     public function test_meeting_manager_can_end_a_meeting_manually(): void
@@ -1119,7 +1715,7 @@ class PortalTest extends TestCase
         ])->get('/meetings/'.$meetingId)
             ->assertOk()
             ->assertDontSee('Selesaikan Rapat')
-            ->assertSee('Buka menu fitur');
+            ->assertSee('aria-label="Fitur Pengelola Rapat"', false);
         $this->withSession([
             'employee_id' => $employeeId,
             'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
@@ -1234,7 +1830,9 @@ class PortalTest extends TestCase
         $this->get('/live-board')
             ->assertOk()
             ->assertSee('Live Board · Semua Ruang')
-            ->assertSee('Kembali ke Dashboard');
+            ->assertSee('logo-home-link')
+            ->assertSee('aria-label="Kembali ke Dashboard"', false)
+            ->assertSee(route('dashboard'));
 
         $this->getJson('/live-board/data')
             ->assertOk()
@@ -1289,7 +1887,8 @@ class PortalTest extends TestCase
         $this->withSession(['admin_id' => 1])
             ->get('/admin/rapat')
             ->assertOk()
-            ->assertSee('Absen masuk (1)')
+            ->assertSee('Absen masuk')
+            ->assertSee('1 pegawai')
             ->assertSee('Daftar absen pulang')
             ->assertSee('Pegawai Hadir')
             ->assertSee('123456789012345678')
@@ -1367,7 +1966,8 @@ class PortalTest extends TestCase
         'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
         ])->get('/meetings/'.$meetingId)
         ->assertOk()
-        ->assertSee('class="tag selesai">selesai', false);
+        ->assertSee('meeting-detail-status-selesai')
+        ->assertSee('>Selesai</span>', false);
     }
 
     public function test_employee_can_view_saved_minutes_during_an_ongoing_meeting_without_being_the_recorder(): void
@@ -1454,7 +2054,8 @@ class PortalTest extends TestCase
         $this->withSession([
             'employee_id' => $employeeId,
             'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
-        ])->get('/')
+            'active_role' => 'admin',
+        ])->get('/admin/rapat?edit=0')
             ->assertOk()
             ->assertSee('id="mulai-hour"', false)
             ->assertSee('<option value="09" selected>09</option>', false)
@@ -1559,6 +2160,17 @@ class PortalTest extends TestCase
 
     public function test_admin_can_create_a_meeting_for_all_employees_without_selecting_invitees(): void
     {
+        $this->withSession(['admin_id' => 1])->get('/admin/rapat?edit=0')
+            ->assertOk()
+            ->assertSee('Notulen diisi melalui halaman detail saat rapat berlangsung atau setelah rapat selesai.')
+            ->assertSee('Pilih akun pegawai')
+            ->assertSee('meeting-chair-picker-search')
+            ->assertSee('meeting-minute-taker-picker-search')
+            ->assertSee('role="combobox"', false)
+            ->assertSee('data-signer-picker', false)
+            ->assertDontSee('name="notulen"', false)
+            ->assertDontSee('name="file_notulen"', false);
+
         $this->withSession(['admin_id' => 1])->post('/admin/actions', [
             'aksi' => 'simpan_rapat',
             'judul' => 'Rapat Semua Pegawai',
@@ -1575,7 +2187,25 @@ class PortalTest extends TestCase
 
         $this->withSession(['admin_id' => 1])->get('/admin/rapat?edit='.$meetingId)
             ->assertOk()
-            ->assertSee('data-all-employees checked', false);
+            ->assertSee('data-all-employees checked', false)
+            ->assertDontSee('name="notulen"', false)
+            ->assertDontSee('name="file_notulen"', false);
+
+        DB::table('rapat')->where('id', $meetingId)->update(['notulen' => 'Notulen diisi setelah rapat.']);
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'simpan_rapat',
+            'id' => $meetingId,
+            'judul' => 'Rapat Semua Pegawai',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+            'semua_pegawai' => '1',
+        ])->assertRedirect('/admin/rapat');
+        $this->assertDatabaseHas('rapat', [
+            'id' => $meetingId,
+            'notulen' => 'Notulen diisi setelah rapat.',
+        ]);
     }
 
     public function test_admin_can_set_global_manager_permissions_and_promote_employee_to_super_admin(): void
@@ -1696,7 +2326,7 @@ class PortalTest extends TestCase
             ->assertDontSee('Buat kode absen pulang');
         $this->withSession($session)->get('/meetings/'.$meetingId)
             ->assertOk()
-            ->assertSee('Buka menu fitur')
+            ->assertSee('aria-label="Fitur Pengelola Rapat"', false)
             ->assertDontSee('Pembuatan dan pengelolaan kode presensi hanya dapat dilakukan oleh Super Admin.')
             ->assertDontSee('Daftar absen masuk')
             ->assertDontSee('Buka / perbarui kode')
@@ -1748,8 +2378,9 @@ class PortalTest extends TestCase
         $this->withSession($managerSession)->get('/meetings/'.$meetingId)
             ->assertOk()
             ->assertSee('Presensi rapat')
-            ->assertSee('Kode presensi aktif')
-            ->assertSee('Buka menu fitur')
+            ->assertSee('Kode presensi hadir / pulang')
+            ->assertSee('Kode aktif sampai')
+            ->assertSee('name="kode"', false)
             ->assertSee(route('admin', 'rapat'), false)
             ->assertDontSee('Pengelolaan kode presensi')
             ->assertDontSee('Kelola presensi')
@@ -1757,6 +2388,8 @@ class PortalTest extends TestCase
             ->assertDontSee('Daftar absen masuk')
             ->assertSee('Tambah materi (PDF, PPT, dokumen, spreadsheet, gambar, atau ZIP; maks. 20 MB)')
             ->assertSee('Tambah rekaman')
+            ->assertSee('SIMULASI PENGISIAN')
+            ->assertSee('Simulasi Pengisian Notulen Rapat')
             ->assertSee('Isi / tambah / ubah notulen');
 
         $this->withSession($managerSession)->post('/meetings/'.$meetingId.'/actions', [
@@ -1797,11 +2430,11 @@ class PortalTest extends TestCase
         );
 
         $this->withSession($managerSession)->get('/admin/rapat')
-            ->assertOk()
-            ->assertSee('+ Tambah rapat');
+            ->assertOk();
         $this->withSession($managerSession)->get('/admin/rapat?edit='.$meetingId)
             ->assertOk()
-            ->assertSee('PDF notulen')
+            ->assertSee('Notulen diisi melalui halaman detail saat rapat berlangsung atau setelah rapat selesai.')
+            ->assertDontSee('PDF notulen')
             ->assertSee('Unggah materi');
     }
 
@@ -2000,7 +2633,7 @@ class PortalTest extends TestCase
         $this->withSession($superAdminSession)->get('/meetings/'.$meetingId)
             ->assertOk()
             ->assertSee('Presensi rapat')
-            ->assertSee('Buka menu fitur')
+            ->assertSee('aria-label="Fitur Pengelola Rapat"', false)
             ->assertDontSee('Pengelolaan kode presensi')
             ->assertDontSee('Kelola presensi')
             ->assertDontSee('Selesaikan Rapat');
@@ -2020,9 +2653,9 @@ class PortalTest extends TestCase
         $this->withSession($superAdminSession)->get('/meetings/'.$meetingId)
             ->assertOk()
             ->assertSee('Pegawai yang wajib mengikuti')
-            ->assertSee('Rapat ini untuk semua pegawai.')
-            ->assertSee('Presensi Anda sudah tercatat')
-            ->assertSee('Buka menu fitur')
+            ->assertSee('Rapat ini terbuka untuk semua pegawai.')
+            ->assertSee('Absen hadir tercatat pada')
+            ->assertSee('aria-label="Fitur Pengelola Rapat"', false)
             ->assertDontSee('Daftar absen masuk (1)')
             ->assertDontSee('Pengelolaan kode presensi')
             ->assertDontSee('Kelola presensi')
@@ -2031,7 +2664,7 @@ class PortalTest extends TestCase
             ->assertSee('Tambah rekaman');
     }
 
-    public function test_employee_can_record_attendance_with_the_meeting_code_without_nip_suffix(): void
+    public function test_employee_can_record_attendance_using_the_super_admin_code(): void
     {
         $employeeId = DB::table('pegawai')->insertGetId([
             'nip' => '876543210987654321',
@@ -2043,7 +2676,7 @@ class PortalTest extends TestCase
             'judul' => 'Rapat Presensi',
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subHour()->format('H:i'),
-            'selesai' => now()->subMinutes(5)->format('H:i'),
+            'selesai' => now()->addHour()->format('H:i'),
             'moda' => 'Luring',
             'kode_presensi' => 'RAPAT7',
             'presensi_kedaluwarsa' => now()->addMinutes(20)->toDateTimeString(),
@@ -2054,6 +2687,13 @@ class PortalTest extends TestCase
             ->get('/')
             ->assertOk()
             ->assertSee('🟢 Presensi buka');
+
+        $this->withSession($session)
+            ->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('Kode presensi hadir / pulang')
+            ->assertSee('name="aksi" value="hadir"', false)
+            ->assertSee('name="kode"', false);
 
         $this->withSession($session)
             ->post('/meetings/'.$meetingId.'/actions', ['aksi' => 'hadir', 'kode' => 'RAPAT7'])
@@ -2071,7 +2711,7 @@ class PortalTest extends TestCase
             ->assertDontSee('Presensi pulang buka');
     }
 
-    public function test_employee_can_prepare_attendance_while_waiting_for_the_code_to_be_opened(): void
+    public function test_employee_attendance_field_stays_visible_until_super_admin_opens_the_code(): void
     {
         $this->travelTo(now()->setTime(10, 0));
         $employeeId = DB::table('pegawai')->insertGetId([
@@ -2094,7 +2734,7 @@ class PortalTest extends TestCase
 
         $this->withSession($session)->get('/meetings/'.$meetingId)
             ->assertOk()
-            ->assertSee('Menunggu kode presensi dibuat atau diberikan oleh Pengelola Rapat.')
+            ->assertSee('Kode hadir belum dibuka.')
             ->assertSee('name="aksi" value="hadir"', false)
             ->assertSee('name="kode"', false);
 
@@ -2108,19 +2748,66 @@ class PortalTest extends TestCase
             'rapat_id' => $meetingId,
             'pegawai_id' => $employeeId,
         ]);
-
         DB::table('rapat')->where('id', $meetingId)->update([
             'kode_presensi' => 'KODE99',
             'presensi_kedaluwarsa' => now()->addMinutes(15),
         ]);
         $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'hadir',
+            'kode' => 'SALAH',
+        ])->assertRedirect()
+            ->assertSessionHasErrors('presensi');
+        $this->assertDatabaseMissing('kehadiran', [
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $employeeId,
+        ]);
+        $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'hadir',
             'kode' => 'KODE99',
-        ])->assertRedirect();
+        ])->assertRedirect()
+            ->assertSessionHas('status', 'Presensi hadir berhasil dicatat.');
+
         $this->assertDatabaseHas('kehadiran', [
             'rapat_id' => $meetingId,
             'pegawai_id' => $employeeId,
             'status' => 'hadir',
+        ]);
+    }
+
+    public function test_employee_sees_attendance_panel_before_meeting_and_cannot_check_in_early(): void
+    {
+        $this->travelTo(now()->setTime(10, 0));
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '111111111111111111',
+            'nama' => 'Pegawai Menunggu Rapat',
+            'jabatan' => 'Pegawai',
+            'password_hash' => Hash::make('password-tes'),
+        ]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Presensi Otomatis',
+            'tanggal' => now()->toDateString(),
+            'mulai' => '11:00',
+            'selesai' => '12:00',
+            'moda' => 'Luring',
+        ]);
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
+        ];
+
+        $this->withSession($session)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('Masukkan kode hadir dari Super Admin saat rapat berlangsung.')
+            ->assertSee('name="kode"', false);
+
+        $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'hadir',
+        ])->assertRedirect()
+            ->assertSessionHasErrors('presensi');
+
+        $this->assertDatabaseMissing('kehadiran', [
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $employeeId,
         ]);
     }
 
@@ -2162,7 +2849,6 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('Presensi rapat')
             ->assertSee('name="aksi" value="hadir"', false)
-            ->assertSee('Buka menu fitur')
             ->assertDontSee('Pengelolaan kode presensi')
             ->assertDontSee('Kelola presensi');
 
@@ -2178,7 +2864,7 @@ class PortalTest extends TestCase
         ]);
         $this->withSession($session)->get('/meetings/'.$meetingId)
             ->assertOk()
-            ->assertSee('Presensi Anda sudah tercatat')
+            ->assertSee('Absen hadir tercatat pada')
             ->assertDontSee('name="aksi" value="hadir"', false);
 
         $completedMeetingId = DB::table('rapat')->insertGetId([
@@ -2199,9 +2885,9 @@ class PortalTest extends TestCase
 
         $this->withSession($session)->get('/meetings/'.$completedMeetingId)
             ->assertOk()
-            ->assertSee('Absen pulang')
             ->assertSee('name="aksi" value="absen_pulang"', false)
-            ->assertSee('Buka menu fitur')
+            ->assertSee('Kode presensi hadir / pulang')
+            ->assertSee('name="kode"', false)
             ->assertDontSee('Pengelolaan kode presensi')
             ->assertDontSee('Kelola presensi')
             ->assertDontSee('Selesaikan Rapat');
@@ -2242,8 +2928,9 @@ class PortalTest extends TestCase
             ->assertSee('🟢 Presensi pulang buka');
         $this->withSession($session)->get('/meetings/'.$meetingId)
             ->assertOk()
-            ->assertSee('Belum Absen Pulang')
-            ->assertSee('Alasan pulang duluan');
+            ->assertSee('catat absen pulang')
+            ->assertSee('Isi alasan pulang lebih awal')
+            ->assertSee('Alasan pulang lebih awal / belum absen pulang');
         $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'absen_pulang',
             'kode' => 'PULANG7',
@@ -2255,7 +2942,7 @@ class PortalTest extends TestCase
             ->assertDontSee('Presensi pulang buka');
     }
 
-    public function test_employee_can_submit_checkout_code_before_meeting_is_manually_ended(): void
+    public function test_employee_can_submit_checkout_code_when_checkout_is_open(): void
     {
         $this->travelTo(now()->setTime(10, 0));
         $employeeId = DB::table('pegawai')->insertGetId([
@@ -2287,9 +2974,19 @@ class PortalTest extends TestCase
         ];
         $this->withSession($session)->get('/meetings/'.$meetingId)
             ->assertOk()
-            ->assertSee('Absen pulang dibuka')
-            ->assertSee('Kode absen pulang')
-            ->assertSee('name="aksi" value="absen_pulang"', false);
+            ->assertSee('Kode presensi hadir / pulang')
+            ->assertSee('name="aksi" value="absen_pulang"', false)
+            ->assertSee('name="kode"', false);
+
+        $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'absen_pulang',
+            'kode' => 'SALAH',
+        ])->assertRedirect()
+            ->assertSessionHasErrors('presensi_pulang');
+        $this->assertNull(DB::table('kehadiran')
+            ->where('rapat_id', $meetingId)
+            ->where('pegawai_id', $employeeId)
+            ->value('waktu_pulang'));
 
         $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'absen_pulang',
@@ -2350,11 +3047,11 @@ class PortalTest extends TestCase
             ->assertDontSee('Daftar absen masuk')
             ->assertDontSee('Daftar absen pulang')
             ->assertSee('Belum Absen Pulang')
-            ->assertSee('Alasan pulang duluan');
+            ->assertSee('Alasan pulang lebih awal / belum absen pulang');
         $this->withSession(['admin_id' => 1])->get('/admin/kehadiran')
             ->assertOk()
             ->assertSee('Rapat Pantau Absen Pulang')
             ->assertSee('Belum Absen Pulang')
-            ->assertSee('Alasan pulang duluan');
+            ->assertSee('Alasan: Belum diisi pegawai.');
     }
 }

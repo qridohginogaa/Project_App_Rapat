@@ -10,7 +10,9 @@
 <body class="live-board-page{{ $selectedRoom ? ' live-board-room' : '' }}">
     <header class="live-board-header">
         <div class="live-board-brand">
-            <img src="{{ asset('assets/img/logo.png') }}" alt="Kemenkes Poltekkes Manado" class="logo">
+            <a class="logo-home-link" href="{{ route('dashboard') }}" aria-label="Kembali ke Dashboard" title="Kembali ke Dashboard">
+                <img src="{{ asset('assets/img/logo.png') }}" alt="Kemenkes Poltekkes Manado" class="logo">
+            </a>
             <div>
                 <p class="live-board-kicker">POLTEKKES KEMENKES MANADO</p>
                 <h1>Live Board{{ $selectedRoom ? ' · '.$selectedRoom->nama : ' · Semua Ruang' }}</h1>
@@ -20,7 +22,6 @@
         <div class="live-board-actions">
             <time id="live-board-clock">--:--:-- WITA</time>
             <button id="live-board-fullscreen" class="btn sm" type="button" aria-label="Tampilkan layar penuh">Tampilkan layar penuh</button>
-            <a class="btn sm live-board-back" href="{{ route('dashboard') }}">Kembali ke Dashboard</a>
         </div>
     </header>
     <main class="live-board-content" data-live-board data-endpoint="{{ route('live-board.data', $selectedRoom ? ['room_id' => $selectedRoom->id] : []) }}">
