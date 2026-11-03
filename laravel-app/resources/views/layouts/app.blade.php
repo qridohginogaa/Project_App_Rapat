@@ -39,7 +39,14 @@
             @endif
             <form method="post" action="{{ route('logout') }}">@csrf<button class="btn">Keluar</button></form>
         @else
-            <a class="btn" href="{{ route('login') }}">Login</a>
+            <nav class="top-guest-actions" aria-label="Akses publik">
+                @if(request()->routeIs('dashboard') && !($canSeeMeetings ?? false))
+                    <a class="btn top-guest-attendance" href="{{ route('guest-attendance') }}">
+                        Presensi Tamu &amp; Mahasiswa
+                    </a>
+                @endif
+                <a class="btn" href="{{ route('login') }}">Login</a>
+            </nav>
         @endif
     </div>
     <div class="bar"></div>
@@ -52,6 +59,9 @@
                 @endif
                 @if($canManageRooms)
                     <a href="{{ route('admin', 'ruang') }}">Ruang Rapat</a>
+                @endif
+                @if(!empty($canManageInviteGroups))
+                    <a href="{{ route('admin', 'grup') }}">Grup Undangan</a>
                 @endif
                 @if($canManageRoles)
                     <a href="{{ route('admin', 'pegawai') }}">Pegawai</a>

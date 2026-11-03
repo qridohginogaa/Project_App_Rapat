@@ -324,7 +324,7 @@
             <summary><b>Isi / tambah / ubah notulen</b></summary>
             <form method="post" action="{{ route('meetings.action', $meeting->id) }}" enctype="multipart/form-data" class="mt-3">@csrf<input type="hidden" name="aksi" value="simpan_notulen">
                 <textarea id="minutes" name="notulen" rows="10">{{ $meeting->notulen }}</textarea>
-                <button class="btn sm mt-2" type="button" onclick="if(confirm('Isi kolom dengan draf notulen?'))document.getElementById('minutes').value=@js($minutesDraft)">Masukkan draf otomatis</button>
+                <button class="btn sm mt-2" type="button" data-minutes-draft="{{ $minutesDraft }}" onclick="if(confirm('Isi kolom dengan draf notulen?'))document.getElementById('minutes').value=this.dataset.minutesDraft">Masukkan draf otomatis</button>
                 <label>Berkas PDF (maks. 15 MB)</label><input type="file" name="file_notulen" accept=".pdf">
                 @if($meeting->file_notulen)<label><input type="checkbox" name="hapus_file_notulen" value="1" style="width:auto"> Hapus berkas PDF</label>@endif
                 <button class="btn pri mt-3">Simpan notulen</button>

@@ -8,7 +8,7 @@ Route::get('/', [PortalController::class, 'dashboard'])->name('dashboard');
 Route::get('/login', [PortalController::class, 'loginForm'])->name('login');
 Route::post('/login', [PortalController::class, 'login'])->name('login.submit');
 Route::post('/logout', [PortalController::class, 'logout'])->name('logout');
-Route::post('/role/switch', [PortalController::class, 'switchRole'])->name('role.switch');
+Route::post('/role/switch', [PortalController::class, 'switchRole'])->middleware(RequireChangedEmployeePassword::class)->name('role.switch');
 Route::post('/employee/login', [PortalController::class, 'employeeLogin'])->name('employee.login');
 Route::get('/employee/password', [PortalController::class, 'employeePasswordForm'])->name('employee.password');
 Route::post('/employee/password', [PortalController::class, 'updateEmployeePassword'])->name('employee.password.update');
@@ -18,6 +18,7 @@ Route::get('/guest-attendance', [PortalController::class, 'guestAttendanceForm']
 Route::post('/guest-attendance', [PortalController::class, 'registerGuestAttendance'])->middleware('throttle:60,1')->name('guest-attendance.store');
 Route::get('/meetings/{meeting}', [PortalController::class, 'meeting'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.show');
 Route::get('/meetings/{meeting}/minutes-attendance/export', [PortalController::class, 'exportMeetingReport'])
+    ->middleware(RequireChangedEmployeePassword::class)
     ->whereNumber('meeting')
     ->name('meetings.report.export');
 Route::get('/signatures', [PortalController::class, 'signatureInbox'])
@@ -35,12 +36,21 @@ Route::post('/meetings/{meeting}/actions', [PortalController::class, 'meetingAct
 
 Route::get('/admin/login', fn () => redirect()->route('login'))->name('admin.login');
 Route::get('/admin/attendance/{meeting}/{type}/export', [PortalController::class, 'exportAttendance'])
+    ->middleware(RequireChangedEmployeePassword::class)
     ->whereNumber('meeting')
     ->whereIn('type', ['pegawai', 'tamu'])
     ->name('admin.attendance.export');
 Route::get('/live-board', [PortalController::class, 'liveBoard'])->name('live-board');
 Route::get('/live-board/data', [PortalController::class, 'liveBoardData'])->name('live-board.data');
-Route::get('/admin/{tab?}', [PortalController::class, 'admin'])->where('tab', 'ringkasan|rapat|ruang|kehadiran|pegawai|superadmin|pengaturan')->name('admin');
-Route::post('/admin/actions', [PortalController::class, 'adminAction'])->name('admin.action');
+Route::get('/admin/{tab?}', [PortalController::class, 'admin'])
+    ->middleware(RequireChangedEmployeePassword::class)
+    ->where('tab', 'ringkasan|rapat|ruang|kehadiran|pegawai|grup|superadmin|pengaturan')
+    ->name('admin');
+Route::post('/admin/actions', [PortalController::class, 'adminAction'])
+    ->middleware(RequireChangedEmployeePassword::class)
+    ->name('admin.action');
 
-Route::get('/files/{filename}', [PortalController::class, 'file'])->where('filename', '[A-Za-z0-9._-]+')->name('files.show');
+Route::get('/files/{filename}', [PortalController::class, 'file'])
+    ->middleware(RequireChangedEmployeePassword::class)
+    ->where('filename', '[A-Za-z0-9._-]+')
+    ->name('files.show');

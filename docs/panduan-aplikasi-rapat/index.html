@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Buku Panduan Aplikasi Rapat - Poltekkes Kemenkes Manado</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --ink: #1d2b3f;
+            --muted: #62758a;
+            --teal: #008477;
+            --teal-dark: #006d64;
+            --mint: #eaf8f5;
+            --line: #d7e7e8;
+            --gold: #f0ad32;
+        }
+
+        * { box-sizing: border-box; }
+
+        html { background: #eaf0f3; }
+
+        body {
+            width: 210mm;
+            margin: 0 auto;
+            background: #fff;
+            color: var(--ink);
+            font: 10.3pt/1.48 "Segoe UI", Arial, sans-serif;
+        }
+
+        .page {
+            position: relative;
+            min-height: 297mm;
+            padding: 17mm 17mm 21mm;
+            break-after: page;
+            page-break-after: always;
+        }
+
+        .page:last-child {
+            break-after: auto;
+            page-break-after: auto;
+        }
+
+        h1, h2, h3, p { margin-top: 0; }
+        h1 { font-size: 30pt; line-height: 1.08; letter-spacing: -.8pt; }
+        h2 { margin-bottom: 4mm; color: var(--teal-dark); font-size: 20pt; line-height: 1.15; }
+        h3 { margin-bottom: 1.5mm; font-size: 11pt; }
+        p { margin-bottom: 3mm; }
+        a { color: var(--teal-dark); }
+        ul, ol { margin: 1.5mm 0 3mm; padding-left: 6mm; }
+        li { margin: 0 0 1.3mm; padding-left: 1mm; }
+        strong { color: #23354a; }
+
+        .eyebrow {
+            margin-bottom: 3mm;
+            color: var(--teal);
+            font-size: 8pt;
+            font-weight: 800;
+            letter-spacing: 1.3pt;
+            text-transform: uppercase;
+        }
+
+        .lead { color: var(--muted); font-size: 12pt; }
+        .small, figcaption, .muted { color: var(--muted); font-size: 8.5pt; }
+        .page-kicker { color: var(--muted); font-size: 8pt; font-weight: 700; }
+
+        .cover {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            background:
+                radial-gradient(ellipse at 92% 18%, rgba(181, 229, 108, .22), transparent 34%),
+                radial-gradient(ellipse at 8% 84%, rgba(0, 164, 151, .17), transparent 38%),
+                linear-gradient(145deg, #f8fcfb 0%, #edf9f7 55%, #f7fbef 100%);
+        }
+
+        .cover::before {
+            position: absolute;
+            top: -1mm;
+            left: -1mm;
+            width: 76mm;
+            height: 72mm;
+            background: linear-gradient(132deg, #087d72 0 54%, #b8df3a 54.3% 59%, #fff 59.3% 62%, #087d72 62.3% 75%, transparent 75.3%);
+            clip-path: polygon(0 0, 100% 0, 0 100%);
+            content: "";
+        }
+
+        .cover::after {
+            position: absolute;
+            right: 35mm;
+            bottom: 45mm;
+            width: 64mm;
+            height: 64mm;
+            border: 2mm solid rgba(0, 132, 119, .2);
+            border-radius: 50%;
+            content: "";
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 4mm;
+            color: var(--teal-dark);
+            font-size: 9pt;
+            font-weight: 800;
+        }
+
+        .cover .brand { position: relative; z-index: 1; align-self: flex-end; margin-top: 5mm; padding: 2mm 3mm; border: 1px solid var(--line); border-radius: 3mm; background: rgba(255,255,255,.92); }
+
+        .brand-mark {
+            display: grid;
+            width: 14mm;
+            height: 14mm;
+            place-items: center;
+            border: 1px solid #c9e8e4;
+            border-radius: 4mm;
+            background: white;
+            color: var(--teal);
+            font-size: 14pt;
+            font-weight: 900;
+            box-shadow: 0 2mm 6mm rgba(30, 70, 70, .08);
+        }
+
+        .cover-copy { position: relative; z-index: 1; margin: 19mm 0 14mm; }
+        .cover h1 { max-width: 175mm; margin-bottom: 5mm; color: var(--teal-dark); font-size: 34pt; letter-spacing: 1pt; }
+        .cover h2 { max-width: 155mm; margin-bottom: 5mm; color: var(--ink); font-size: 23pt; }
+        .cover .lead { max-width: 140mm; font-size: 12pt; }
+        .cover-rule { width: 28mm; height: 2mm; margin: 8mm 0; border-radius: 2mm; background: var(--teal); }
+        .cover-tags { display: flex; flex-wrap: wrap; gap: 2mm; margin-top: 10mm; }
+        .pill { padding: 1.5mm 3mm; border: 1px solid #cfe7e4; border-radius: 20mm; background: rgba(255,255,255,.82); color: var(--teal-dark); font-size: 8pt; font-weight: 700; }
+        .cover-meta { position: relative; z-index: 1; display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 5mm; color: var(--muted); font-size: 8.5pt; }
+        .cover-facts { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; margin: 0 0 8mm; }
+        .cover-fact { padding: 3mm; border-left: 1mm solid var(--teal); background: rgba(255,255,255,.76); }
+        .cover-fact b, .cover-fact span { display: block; }
+        .cover-fact b { color: var(--teal-dark); font-size: 8pt; }
+        .cover-fact span { margin-top: 1mm; color: var(--muted); font-size: 7.5pt; }
+
+        .section-head { margin-bottom: 5mm; padding-bottom: 3mm; border-bottom: 1px solid var(--line); }
+        .contents-list { margin: 4mm 0; padding: 0; list-style: none; }
+        .contents-list li { display: flex; align-items: baseline; gap: 2mm; margin: 0; padding: 2.2mm 0; border-bottom: 1px dotted #b8ccce; }
+        .contents-list a { display: flex; flex: 1; align-items: baseline; gap: 2mm; color: var(--ink); text-decoration: none; }
+        .contents-list .contents-title { font-weight: 650; }
+        .contents-list .contents-leader { flex: 1; border-bottom: 1px dotted #a7b9ba; }
+        .contents-list .contents-page { min-width: 8mm; color: var(--teal-dark); font-weight: 800; text-align: right; }
+        .contents-sub { padding-left: 7mm !important; color: var(--muted); font-size: 8.7pt; }
+        .flow-list { display: grid; gap: 2mm; margin: 5mm 0; padding: 0; list-style: none; counter-reset: flow; }
+        .flow-list li { position: relative; display: flex; align-items: center; gap: 3mm; min-height: 13mm; margin: 0; padding: 2.5mm 4mm 2.5mm 13mm; border: 1px solid var(--line); border-radius: 3mm; background: #fbfdfd; }
+        .flow-list li::before { position: absolute; left: 4mm; display: grid; width: 6mm; height: 6mm; place-items: center; border-radius: 50%; background: var(--teal); color: #fff; content: counter(flow); counter-increment: flow; font-size: 8pt; font-weight: 800; }
+        .flow-arrow { margin: -1mm 0 -1mm 6.5mm; color: var(--teal); font-weight: 900; }
+        .figure-legend { display: flex; flex-wrap: wrap; gap: 2mm 5mm; margin-top: 2mm; color: var(--muted); font-size: 8pt; }
+        .figure-legend span { display: inline-flex; align-items: center; gap: 1.5mm; }
+        .figure-number { display: inline-grid; width: 5mm; height: 5mm; place-items: center; border-radius: 50%; background: #d83a34; color: white; font-size: 7pt; font-weight: 800; }
+        figure.annotated { position: relative; }
+        .figure-pin { position: absolute; display: grid; width: 7mm; height: 7mm; place-items: center; border: 1.2mm solid #fff; border-radius: 50%; background: #d83a34; color: #fff; box-shadow: 0 1mm 3mm rgba(20,35,45,.28); font-size: 8pt; font-weight: 900; }
+        .callout {
+            margin: 3mm 0;
+            padding: 3mm 4mm;
+            border-left: 1.2mm solid var(--teal);
+            border-radius: 0 3mm 3mm 0;
+            background: var(--mint);
+        }
+
+        .warning { border-left-color: var(--gold); background: #fff8e9; }
+
+        .role-grid {
+            width: 100%;
+            margin: 4mm 0;
+            border-collapse: collapse;
+            font-size: 9pt;
+        }
+
+        .role-grid th, .role-grid td { padding: 2.6mm; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+        .role-grid th { background: #edf8f6; color: var(--teal-dark); }
+        .role-grid td:first-child { width: 29mm; font-weight: 700; }
+        .role-grid.compact { margin: 3mm 0; font-size: 8.2pt; line-height: 1.32; }
+        .role-grid.compact th, .role-grid.compact td { padding: 1.7mm 2mm; }
+        .role-grid.compact td:first-child { width: 39mm; }
+        .role-detail-list { margin: 1mm 0 2mm; padding-left: 5mm; font-size: 9pt; }
+        .role-detail-list li { margin-bottom: 1.5mm; }
+
+        .steps { counter-reset: item; list-style: none; padding: 0; }
+        .steps li { position: relative; min-height: 8mm; margin-bottom: 2.2mm; padding-left: 9mm; }
+        .steps li::before {
+            position: absolute;
+            top: .1mm;
+            left: 0;
+            display: grid;
+            width: 6mm;
+            height: 6mm;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--teal);
+            color: white;
+            content: counter(item);
+            counter-increment: item;
+            font-size: 8pt;
+            font-weight: 800;
+        }
+
+        figure { margin: 3mm 0 4mm; break-inside: avoid; page-break-inside: avoid; }
+        figure img {
+            display: block;
+            width: 100%;
+            max-height: 123mm;
+            border: 1px solid var(--line);
+            border-radius: 3mm;
+            object-fit: contain;
+            object-position: top center;
+            background: #f6faf9;
+        }
+        figcaption { margin-top: 1.5mm; }
+        .shot-short img { max-height: 93mm; }
+        .shot-wide img { max-height: 78mm; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+        .two-col > * { min-width: 0; }
+        .mini-card { padding: 3mm; border: 1px solid var(--line); border-radius: 3mm; background: #fbfdfd; }
+        .mini-card h3 { color: var(--teal-dark); }
+        .checklist { list-style: none; padding: 0; }
+        .checklist li { padding-left: 6mm; }
+        .checklist li::before { margin-left: -6mm; padding-right: 2mm; color: var(--teal); content: "✓"; font-weight: 900; }
+        .kbd { padding: .3mm 1.3mm; border: 1px solid var(--line); border-radius: 1mm; background: #f8fbfb; font-family: Consolas, monospace; font-size: 8.5pt; }
+        .page-footer { position: absolute; right: 17mm; bottom: 10mm; left: 17mm; display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 2mm; color: #8292a2; font-size: 7.5pt; }
+
+        @media screen {
+            body { margin: 10mm auto; box-shadow: 0 3mm 14mm rgba(25, 45, 60, .12); }
+            .page { min-height: 297mm; }
+        }
+
+        @media print {
+            @page { size: A4; margin: 0; }
+            html, body { width: auto; margin: 0; background: white; }
+            body { font-size: 9.5pt; }
+            .page { width: 210mm; height: 297mm; min-height: 0; margin: 0; overflow: hidden; }
+            a { color: inherit; text-decoration: none; }
+            figure img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+    <section class="page cover">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true">R</span>
+            <span>POLTEKKES KEMENKES MANADO<br><span class="muted">Sistem Informasi Rapat</span></span>
+        </div>
+        <div class="cover-copy">
+            <div class="eyebrow">Buku panduan pengguna</div>
+            <h1>BUKU PANDUAN</h1>
+            <h2>Aplikasi Rapat</h2>
+            <div class="cover-rule"></div>
+            <p class="lead">Panduan penggunaan aplikasi rapat Poltekkes Kemenkes Manado: dari melihat jadwal dan mengisi presensi sampai mengelola rapat, akun, dan laporan.</p>
+            <div class="cover-tags">
+                <span class="pill">Pegawai</span>
+                <span class="pill">Pengelola Rapat</span>
+                <span class="pill">Super Admin</span>
+                <span class="pill">Tamu &amp; Mahasiswa</span>
+            </div>
+        </div>
+        <div class="cover-facts">
+            <div class="cover-fact"><b>VERSI</b><span>1.0</span></div>
+            <div class="cover-fact"><b>TERBIT</b><span>2 November 2026</span></div>
+            <div class="cover-fact"><b>PLATFORM</b><span>Aplikasi web</span></div>
+            <div class="cover-fact"><b>PERAN UTAMA</b><span>3 peran akun</span></div>
+        </div>
+        <div class="cover-meta">
+            <span>Politeknik Kesehatan Kemenkes Manado</span>
+            <span>Panduan pengguna · Versi 1.1</span>
+        </div>
+    </section>
+
+    <section class="page">
+        <header class="section-head">
+            <div class="eyebrow">Daftar isi</div>
+            <h2>Buku Panduan Aplikasi Rapat</h2>
+            <p class="lead">Pilih bagian sesuai tugas dan role Anda. Nomor halaman mengikuti PDF versi 1.1 ini.</p>
+        </header>
+        <ol class="contents-list">
+            <li><a href="#page-about"><span class="contents-title">1. Tentang aplikasi</span><span class="contents-leader"></span><span class="contents-page">4</span></a></li>
+            <li><a href="#page-flow"><span class="contents-title">2. Alur utama</span><span class="contents-leader"></span><span class="contents-page">5</span></a></li>
+            <li><a href="#page-role-employee"><span class="contents-title">3. Peran dan hak akses</span><span class="contents-leader"></span><span class="contents-page">6</span></a></li>
+            <li class="contents-sub"><a href="#page-role-employee"><span>3.1 Pegawai</span><span class="contents-leader"></span><span class="contents-page">6</span></a></li>
+            <li class="contents-sub"><a href="#page-role-manager"><span>3.2 Pengelola Rapat</span><span class="contents-leader"></span><span class="contents-page">7</span></a></li>
+            <li class="contents-sub"><a href="#page-role-superadmin"><span>3.3 Super Admin</span><span class="contents-leader"></span><span class="contents-page">8</span></a></li>
+            <li class="contents-sub"><a href="#page-role-matrix"><span>3.4 Matriks hak akses</span><span class="contents-leader"></span><span class="contents-page">9</span></a></li>
+            <li><a href="#page-dashboard"><span class="contents-title">4. Memulai dan menggunakan aplikasi</span><span class="contents-leader"></span><span class="contents-page">10</span></a></li>
+            <li class="contents-sub"><a href="#page-dashboard"><span>4.1 Dashboard dan jadwal</span><span class="contents-leader"></span><span class="contents-page">10</span></a></li>
+            <li class="contents-sub"><a href="#page-login"><span>4.2 Login dan kata sandi</span><span class="contents-leader"></span><span class="contents-page">11</span></a></li>
+            <li class="contents-sub"><a href="#page-employee-attendance"><span>4.3 Presensi Pegawai dan izin</span><span class="contents-leader"></span><span class="contents-page">12</span></a></li>
+            <li><a href="#page-guest"><span class="contents-title">5. Presensi Tamu dan Mahasiswa</span><span class="contents-leader"></span><span class="contents-page">13</span></a></li>
+            <li><a href="#page-manager"><span class="contents-title">6. Pengelola Rapat dan jadwal</span><span class="contents-leader"></span><span class="contents-page">14</span></a></li>
+        </ol>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Daftar isi</span><span>02</span></footer>
+    </section>
+
+    <section class="page">
+        <header class="section-head">
+            <div class="eyebrow">Daftar isi · lanjutan</div>
+            <h2>Petunjuk per bab</h2>
+        </header>
+        <ol class="contents-list" start="14">
+            <li class="contents-sub"><a href="#page-manager"><span>6.1 Membuat, mengubah, dan menghapus rapat</span><span class="contents-leader"></span><span class="contents-page">14</span></a></li>
+            <li><a href="#page-codes"><span class="contents-title">7. Kode presensi dan pemantauan</span><span class="contents-leader"></span><span class="contents-page">15</span></a></li>
+            <li><a href="#page-reports"><span class="contents-title">8. Kehadiran, izin, dan laporan</span><span class="contents-leader"></span><span class="contents-page">16</span></a></li>
+            <li><a href="#page-minutes"><span class="contents-title">9. Notulen dan persetujuan tanda tangan</span><span class="contents-leader"></span><span class="contents-page">17</span></a></li>
+            <li><a href="#page-superadmin"><span class="contents-title">10. Administrasi Super Admin</span><span class="contents-leader"></span><span class="contents-page">18</span></a></li>
+            <li><a href="#page-live-board"><span class="contents-title">11. Informasi publik dan Live Board</span><span class="contents-leader"></span><span class="contents-page">19</span></a></li>
+            <li><a href="#page-help"><span class="contents-title">12. Kendala umum dan keamanan</span><span class="contents-leader"></span><span class="contents-page">20</span></a></li>
+        </ol>
+        <div class="callout">
+            <strong>Untuk pembaca</strong>
+            <p class="small">Pegawai dapat langsung membaca Bab 3.1, 4, dan 5. Pengelola Rapat membaca Bab 3.2 serta Bab 6–9. Super Admin membaca Bab 3.3 dan 10. Bab publik dan bantuan berlaku untuk semua pengguna.</p>
+        </div>
+        <h3>Konvensi dalam panduan</h3>
+        <ul class="role-detail-list">
+            <li>Nama menu dan tombol ditulis <strong>tebal</strong> sesuai label yang tampil pada aplikasi.</li>
+            <li>Waktu rapat mengikuti WITA. Tangkapan layar dapat menampilkan data demonstrasi fiktif dan bukan akun/kode yang boleh digunakan.</li>
+            <li>Menu dapat berbeda mengikuti role aktif dan izin Pengelola Rapat yang telah diatur Super Admin.</li>
+        </ul>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Daftar isi</span><span>03</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-about"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 1 · Tentang aplikasi</div>
+            <h2>Aplikasi Rapat dan panduan ini</h2>
+            <p class="lead">Sistem untuk melihat jadwal, mengelola kegiatan rapat, mencatat kehadiran, dan menyiapkan laporan.</p>
+        </header>
+        <p>Aplikasi menyatukan jadwal, informasi rapat, presensi, notulen, dan laporan. Halaman publik menampilkan jadwal serta Live Board; tindakan internal mengikuti role pengguna.</p>
+        <p class="small"><strong>Cakupan buku:</strong> penggunaan dashboard hingga presensi, pengelolaan rapat, akun, role, dan laporan.</p>
+        <table class="role-grid compact">
+            <thead><tr><th>Pengguna</th><th>Akses utama</th><th>Bagian panduan</th></tr></thead>
+            <tbody>
+                <tr><td>Pengunjung</td><td>Melihat jadwal publik, kalender, dan Live Board.</td><td>Bab 4 dan 11</td></tr>
+                <tr><td>Pegawai</td><td>Melihat detail rapat, mencatat presensi sendiri, mengajukan izin, dan menyetujui notulen jika ditugaskan.</td><td>Bab 3.1, 4, 5, 9</td></tr>
+                <tr><td>Pengelola Rapat</td><td>Mengelola rapat sesuai enam izin global yang ditetapkan Super Admin.</td><td>Bab 3.2, 6–9</td></tr>
+                <tr><td>Super Admin</td><td>Mengelola akun, role, izin, ruang, kode presensi, dan pengaturan.</td><td>Bab 3.3, 10</td></tr>
+                <tr><td>Tamu / Mahasiswa</td><td>Mengisi presensi mandiri menggunakan formulir publik dan kode dari panitia.</td><td>Bab 5</td></tr>
+            </tbody>
+        </table>
+        <p class="small"><strong>Alamat:</strong> gunakan alamat resmi dari administrator. <span class="kbd">http://127.0.0.1:8000</span> hanya berlaku pada komputer pengembangan lokal.</p>
+        <h3>Alur cepat</h3>
+        <p class="small">Buka dashboard → login dengan NIP → pilih rapat → periksa agenda dan waktu WITA → isi presensi atau gunakan tindakan yang diizinkan role.</p>
+        <div class="callout warning">
+            <strong>Catatan gambar</strong>
+            <p class="small">Nama, jadwal, dan akun pada screenshot merupakan data demonstrasi fiktif. Gunakan hanya NIP dan kode dari institusi/panitia, bukan data contoh.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>04</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-flow"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 2 · Alur utama</div>
+            <h2>Perjalanan sebuah rapat</h2>
+            <p>Gunakan alur ini untuk mengetahui siapa mengerjakan apa, dari persiapan sampai laporan selesai.</p>
+        </header>
+        <h3>1. Persiapan dan pelaksanaan</h3>
+        <ol class="flow-list">
+            <li><span><strong>Super Admin / Pengelola berizin:</strong> buat jadwal, pilih peserta, tetapkan pimpinan dan notulis, isi agenda.</span></li>
+            <li><span><strong>Super Admin:</strong> buka kode hadir dan informasikan kode yang aktif kepada peserta.</span></li>
+            <li><span><strong>Pegawai / Tamu / Mahasiswa:</strong> buka detail atau formulir publik, lalu isi presensi pada rapat yang tepat.</span></li>
+            <li><span><strong>Pengelola:</strong> pantau rapat dan kehadiran jika izin presensi tersedia.</span></li>
+        </ol>
+        <h3>2. Penyelesaian dan dokumentasi</h3>
+        <ol class="flow-list">
+            <li><span><strong>Pengelola atau Super Admin:</strong> selesaikan rapat yang telah berakhir; sistem membuka kode pulang otomatis 30 menit bila belum ada kode pulang aktif.</span></li>
+            <li><span><strong>Pegawai:</strong> isi kode pulang atau tambahkan alasan bila pulang lebih dahulu/belum dapat mengisi.</span></li>
+            <li><span><strong>Notulis:</strong> lengkapi notulen. <strong>Pimpinan dan notulis:</strong> periksa dan setujui versi notulen terbaru dari menu Tanda tangan.</span></li>
+            <li><span><strong>Pengelola berizin:</strong> tinjau daftar hadir, proses izin, dan unduh laporan yang tersedia.</span></li>
+        </ol>
+        <div class="callout warning">
+            <strong>Pemisahan kewenangan</strong>
+            <p class="small">Membuat jadwal, memantau daftar hadir, dan mengatur kode presensi merupakan kewenangan yang berbeda. Pengelola Rapat yang boleh melihat kehadiran tidak otomatis boleh membuka kode. Ikuti role dan izin yang tampil pada akun.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Alur utama</span><span>05</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-role-employee"></a>
+        <header class="section-head">
+            <div class="eyebrow">Panduan role · 1 dari 4</div>
+            <h2>Pegawai: akses dan alur kerja</h2>
+            <p>Akun Pegawai dipakai untuk mengikuti rapat, mencatat kehadiran pribadi, dan menyelesaikan tugas yang diberikan kepada akun tersebut.</p>
+        </header>
+        <h3>Yang dapat dilakukan Pegawai</h3>
+        <ul class="role-detail-list">
+            <li>Login menggunakan NIP dan kata sandi pada halaman Login yang sama dengan Pengelola Rapat dan Super Admin.</li>
+            <li>Melihat jadwal dan detail rapat, termasuk waktu, lokasi/moda, agenda, peserta, pimpinan/notulis, tautan rapat, materi, rekaman, dan notulen yang tersedia.</li>
+            <li>Mengisi absen masuk saat rapat berlangsung menggunakan kode aktif dari panitia; setelah hadir, mengisi absen pulang dengan kode terpisah.</li>
+            <li>Mengajukan izin sakit, dinas, atau keperluan lain dengan alasan dan bukti bila diminta. Status izin diproses oleh pengelola yang berwenang.</li>
+            <li>Mengisi alasan/keterangan jika pulang lebih dahulu atau belum berhasil mengisi absen pulang.</li>
+            <li>Membuka menu <strong>Tanda tangan</strong> dan menerima persetujuan notulen hanya jika ditetapkan sebagai pimpinan rapat atau notulis.</li>
+        </ul>
+        <h3>Yang tidak tersedia untuk Pegawai biasa</h3>
+        <ul class="role-detail-list">
+            <li>Tidak dapat membuat, mengubah, atau menghapus jadwal rapat; mengatur ruang; mengubah role/akun; atau membuka kode presensi.</li>
+            <li>Tidak dapat melihat daftar identitas presensi pegawai lain, memutuskan izin pegawai lain, atau mengunduh laporan administrasi kecuali mendapat role/izin yang sesuai.</li>
+            <li>Tidak dapat mengubah kata sandi sendiri dari menu akun setelah kata sandi awal diganti. Jika lupa, hubungi Super Admin.</li>
+        </ul>
+        <div class="callout">
+            <strong>Langkah kerja yang disarankan</strong>
+            <p class="small">Login → pilih rapat pada dashboard → periksa agenda dan waktu WITA → isi kode masuk → isi kode pulang saat dibuka → pastikan status tercatat → keluar dari akun jika memakai perangkat bersama.</p>
+        </div>
+        <div class="callout warning">
+            <strong>Role rangkap</strong>
+            <p class="small">Pengelola Rapat tetap merupakan akun pegawai dan dapat memakai mode Pegawai untuk tugas kehadiran pribadi. Beralih mode tidak mengubah NIP atau kata sandi. Super Admin juga login menggunakan akun pegawainya sendiri.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Perbedaan role</span><span>06</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-role-manager"></a>
+        <header class="section-head">
+            <div class="eyebrow">Panduan role · 2 dari 4</div>
+            <h2>Pengelola Rapat: akses operasional</h2>
+            <p>Pengelola Rapat adalah role kerja untuk mengatur kegiatan. Fitur tertentu dapat dibatasi oleh Super Admin dan pengaturannya berlaku bagi semua Pengelola Rapat.</p>
+        </header>
+        <h3>Fitur yang bisa diaktifkan oleh Super Admin</h3>
+        <table class="role-grid compact">
+            <thead><tr><th>Izin</th><th>Jika diaktifkan, Pengelola dapat…</th></tr></thead>
+            <tbody>
+                <tr><td>Buat Rapat</td><td>Membuat, mengubah, dan menghapus jadwal serta mengatur informasi, peserta, agenda, pimpinan, dan notulis.</td></tr>
+                <tr><td>Kelola Notulen</td><td>Mengisi, memperbarui, dan mengunggah PDF notulen dari detail rapat.</td></tr>
+                <tr><td>Materi Presentasi</td><td>Mengunggah atau mengelola materi rapat sesuai batas ukuran/jenis berkas yang ditampilkan.</td></tr>
+                <tr><td>Tautan Rekaman</td><td>Menambahkan tautan rekaman dan mengelola rekaman dari detail rapat.</td></tr>
+                <tr><td>Presensi &amp; Kehadiran</td><td>Melihat daftar hadir/pulang pegawai dan tamu, memproses izin, serta membuka ekspor laporan yang tersedia.</td></tr>
+                <tr><td>Kelola grup jurusan/unit undangan</td><td>Membuat atau menghapus grup dan memakai grup untuk memilih peserta rapat.</td></tr>
+            </tbody>
+        </table>
+        <h3>Selalu dapat dilakukan saat berada pada mode Pengelola</h3>
+        <ul class="role-detail-list">
+            <li>Melihat dashboard internal dan detail rapat, memakai tombol <strong>Beralih ke mode</strong> untuk kembali ke mode Pegawai, serta menandai rapat yang sedang berjalan sebagai selesai.</li>
+            <li>Jika diberi izin presensi, meninjau daftar dan laporan. Izin ini <strong>tidak</strong> memberikan akses untuk membuat, memperpanjang, atau menutup kode hadir/pulang.</li>
+            <li>Menggunakan materi, notulen, dan rekaman yang sudah tersedia walaupun izin untuk mengubah konten tersebut tidak diaktifkan.</li>
+        </ul>
+        <div class="callout warning">
+            <strong>Batas akses</strong>
+            <p class="small">Pengelola Rapat tidak mengelola akun/role pegawai, pengaturan aplikasi, maupun master ruang; tidak mengatur kode presensi; dan tidak bisa mengatur ulang kata sandi. Minta Super Admin bila perlu akses tersebut.</p>
+        </div>
+        <div class="callout">
+            <strong>Perubahan izin berlaku bersama</strong>
+            <p class="small">Super Admin mencentang izin pada menu <strong>Hak Akses</strong> lalu menyimpan. Pengaturan ini berlaku global untuk semua akun Pengelola Rapat, bukan izin terpisah per orang.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Perbedaan role</span><span>07</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-role-superadmin"></a>
+        <header class="section-head">
+            <div class="eyebrow">Panduan role · 3 dari 4</div>
+            <h2>Super Admin: kendali administrasi</h2>
+            <p>Super Admin memiliki akses penuh ke fitur pengelolaan. Tetap gunakan akun sendiri dan berikan role Super Admin hanya kepada petugas yang berwenang.</p>
+        </header>
+        <h3>Administrasi akun dan hak akses</h3>
+        <ol class="role-detail-list">
+            <li>Buka menu <strong>Pegawai</strong> untuk menambah akun dengan nama, NIP 18 digit, dan jabatan; mencari/memperbarui jabatan; mengatur role; mengatur ulang kata sandi; atau menghapus akun.</li>
+            <li>Akun baru memakai NIP sebagai kata sandi awal dan wajib menggantinya saat login pertama. Saat reset kata sandi, berikan kata sandi baru secara pribadi; pegawai diwajibkan menggantinya lagi.</li>
+            <li>Buka <strong>Hak Akses</strong> untuk melihat daftar Super Admin/Pengelola Rapat serta mengaktifkan enam izin Pengelola. Perubahan izin berlaku untuk semua akun Pengelola Rapat.</li>
+        </ol>
+        <h3>Rapat, kode presensi, dan pengaturan</h3>
+        <ul class="role-detail-list">
+            <li>Membuat/mengubah/menghapus rapat; menentukan peserta, pimpinan, notulis, agenda, tautan, materi, dan rekaman.</li>
+            <li>Membuka, memperbarui, memperpanjang, atau menutup kode absen masuk dan kode pulang. Pilih kode sendiri atau biarkan sistem membuatnya otomatis; sampaikan hanya kepada peserta dan pantau masa berlakunya.</li>
+            <li>Memantau presensi, memproses izin, melihat keterangan absen pulang, dan mengunduh laporan sesuai menu yang tersedia.</li>
+            <li>Membuka <strong>Ruang Rapat</strong> untuk menambah/mengaktifkan/nonaktifkan ruang, serta <strong>Pengaturan</strong> untuk menentukan apakah surat izin wajib bila tidak hadir.</li>
+        </ul>
+        <div class="callout warning">
+            <strong>Tindakan yang berdampak besar</strong>
+            <p class="small">Selesaikan rapat hanya bila benar-benar berakhir; kode pulang otomatis dibuka selama 30 menit jika belum ada kode aktif. Penghapusan pegawai/rapat dapat menghapus data terkait. Periksa kembali identitas, judul, dan tanggal sebelum mengonfirmasi.</p>
+        </div>
+        <div class="callout">
+            <strong>Petunjuk kode pulang</strong>
+            <p class="small">Kode pulang terpisah dari kode masuk. Masa berlakunya dapat dipilih 15, 30, atau 60 menit. Kode yang dibuat Super Admin dapat digunakan sesuai status dan waktu kedaluwarsanya; tutup kode jika tidak lagi diperlukan.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Perbedaan role</span><span>08</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-role-matrix"></a>
+        <header class="section-head">
+            <div class="eyebrow">Panduan role · 4 dari 4</div>
+            <h2>Matriks perbedaan hak akses</h2>
+            <p>Ringkasan berikut membandingkan role Pegawai biasa, Pengelola Rapat, dan Super Admin. Fitur Pengelola bergantung pada izin global yang diaktifkan.</p>
+        </header>
+        <table class="role-grid compact">
+            <thead><tr><th>Fitur</th><th>Pegawai</th><th>Pengelola Rapat</th><th>Super Admin</th></tr></thead>
+            <tbody>
+                <tr><td>Lihat jadwal, detail, agenda, materi/notulen yang tersedia</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+                <tr><td>Presensi pribadi / ajukan izin sendiri</td><td>Ya</td><td>Ya, mode Pegawai</td><td>Ya</td></tr>
+                <tr><td>Buat, ubah, dan hapus rapat</td><td>Tidak</td><td>Jika izin Buat Rapat aktif</td><td>Ya</td></tr>
+                <tr><td>Akhiri rapat yang sedang berjalan</td><td>Tidak</td><td>Ya</td><td>Ya</td></tr>
+                <tr><td>Kelola notulen, materi, dan rekaman</td><td>Tidak</td><td>Per izin masing-masing</td><td>Ya</td></tr>
+                <tr><td>Lihat daftar hadir/pulang dan proses izin orang lain</td><td>Tidak</td><td>Jika izin Presensi &amp; Kehadiran aktif</td><td>Ya</td></tr>
+                <tr><td>Buat/perpanjang/tutup kode presensi masuk dan pulang</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
+                <tr><td>Kelola akun, role, dan reset kata sandi</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
+                <tr><td>Kelola ruang dan aturan aplikasi</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
+                <tr><td>Tanda tangan notulen sebagai pimpinan/notulis yang ditunjuk</td><td>Jika ditugaskan</td><td>Jika ditugaskan</td><td>Jika ditugaskan</td></tr>
+            </tbody>
+        </table>
+        <div class="callout">
+            <strong>Jika menu atau tombol tidak muncul</strong>
+            <p class="small">Periksa role yang dipakai dan izin Pengelola Rapat. Untuk izin yang belum tersedia, minta Super Admin memeriksa menu <strong>Pegawai</strong> atau <strong>Hak Akses</strong>. Ketiadaan menu tidak dapat diatasi hanya dengan membuka tautan secara langsung.</p>
+        </div>
+        <div class="callout warning">
+            <strong>Ketentuan kata sandi</strong>
+            <p class="small">Seluruh role memakai satu halaman Login dan NIP sendiri. Hanya Super Admin yang dapat menambah akun atau mengatur ulang kata sandi; Pengelola Rapat bukan petugas reset kata sandi.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Perbedaan role</span><span>09</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-dashboard"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 4 · Memulai</div>
+            <h2>Dashboard dan jadwal rapat</h2>
+            <p>Dashboard menampilkan jadwal rapat, jam Manado (WITA), kalender, serta akses cepat ke presensi tamu dan Live Board.</p>
+        </header>
+        <figure class="annotated">
+            <img src="screenshots/01-dashboard.png" alt="Tangkapan layar dashboard publik terbaru dengan tombol presensi dan Login di header, jam WITA di samping judul, jadwal rapat, Live Board, dan kalender">
+            <figcaption>Gambar 1. Dashboard publik terbaru. Jumlah dan daftar rapat mengikuti data yang terdaftar; jam mengikuti waktu Manado (WITA).</figcaption>
+            <span class="figure-pin" style="left:86%;top:3%">1</span>
+            <span class="figure-pin" style="left:70%;top:13%">2</span>
+            <span class="figure-pin" style="left:8%;top:27%">3</span>
+            <span class="figure-pin" style="left:8%;top:49%">4</span>
+        </figure>
+        <div class="figure-legend">
+            <span><b class="figure-number">1</b> Tombol presensi tamu/mahasiswa dan Login</span>
+            <span><b class="figure-number">2</b> Judul dashboard dan jam WITA</span>
+            <span><b class="figure-number">3</b> Daftar rapat akan datang/berlangsung</span>
+            <span><b class="figure-number">4</b> Pintasan Live Board dan kalender</span>
+        </div>
+        <ol class="steps">
+            <li>Gunakan tombol <strong>Presensi Tamu &amp; Mahasiswa</strong> untuk membuka formulir publik, atau <strong>Login</strong> untuk masuk menggunakan akun.</li>
+            <li>Pegawai yang sudah login dapat memilih kartu rapat untuk membuka detail. Pengunjung hanya melihat informasi yang disediakan untuk publik.</li>
+            <li>Jam dan tanggal Manado (WITA) kini tampil di samping judul <strong>Jadwal rapat</strong>. Kartu ringkasan jumlah rapat yang sebelumnya berada di bagian atas sudah dihapus; daftar rapat tetap tersedia di bawah judulnya.</li>
+            <li>Gulir ke bawah untuk membuka <strong>Semua ruang</strong> atau Live Board ruang tertentu, serta gunakan kalender untuk melihat tanggal bertanda dan jadwal/libur.</li>
+        </ol>
+        <div class="callout">
+            <strong>Jika daftar rapat kosong</strong>
+            <p class="small">Artinya belum ada rapat yang akan datang/berlangsung pada saat itu, atau filter tanggal/status tidak menampilkan rapat. Tangkapan layar ini menunjukkan kondisi tanpa rapat aktif; kalender dan tautan tetap dapat digunakan.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>10</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-login"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 4 · Akun pengguna</div>
+            <h2>Login &amp; kata sandi</h2>
+            <p>Pegawai, Pengelola Rapat, dan Super Admin masuk melalui halaman Login yang sama.</p>
+        </header>
+        <figure class="shot-short annotated">
+            <img src="screenshots/02-login.png" alt="Halaman login pegawai dengan kolom NIP dan kata sandi">
+            <figcaption>Gambar 2. Halaman Login. Masukkan NIP dan kata sandi akun Anda.</figcaption>
+            <span class="figure-pin" style="left:34%;top:21%">1</span>
+            <span class="figure-pin" style="left:34%;top:31%">2</span>
+            <span class="figure-pin" style="left:34%;top:40%">3</span>
+        </figure>
+        <div class="figure-legend">
+            <span><b class="figure-number">1</b> NIP pegawai</span>
+            <span><b class="figure-number">2</b> Kata sandi</span>
+            <span><b class="figure-number">3</b> Tombol Login</span>
+        </div>
+        <ol class="steps">
+            <li>Pilih <strong>Login</strong> dari bagian atas dashboard.</li>
+            <li>Isi <strong>NIP</strong> dan <strong>Kata sandi</strong>, lalu pilih <strong>Login</strong>.</li>
+            <li>Akun pegawai baru biasanya menggunakan NIP sebagai kata sandi awal dan diwajibkan membuat kata sandi baru pada login pertama.</li>
+            <li>Kata sandi baru harus sedikitnya 8 karakter. Masukkan kata sandi yang sama pada kolom konfirmasi, lalu simpan.</li>
+        </ol>
+        <div class="two-col">
+            <div class="mini-card">
+                <h3>Lupa kata sandi?</h3>
+                <p class="small">Hubungi Super Admin untuk mengatur ulang kata sandi. Kata sandi hasil reset wajib diganti saat login berikutnya.</p>
+            </div>
+            <div class="mini-card">
+                <h3>Akun bersama role admin</h3>
+                <p class="small">Pengelola Rapat menggunakan NIP pegawainya sendiri. Bila tersedia, gunakan tombol mode untuk kembali ke tampilan Pegawai atau masuk ke fitur Pengelola Rapat.</p>
+            </div>
+        </div>
+        <div class="callout warning">
+            <strong>Jaga akun Anda</strong>
+            <p class="small">Jangan bagikan kata sandi atau kode presensi. Setelah selesai, pilih <strong>Keluar</strong>, terutama pada komputer bersama.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>11</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-employee-attendance"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 4 · Pegawai</div>
+            <h2>Absen masuk, absen pulang, dan izin</h2>
+            <p>Presensi pegawai dilakukan dari detail rapat menggunakan kode yang dibagikan oleh Super Admin/panitia.</p>
+        </header>
+        <ol class="steps">
+            <li>Login, cari rapat pada dashboard, lalu pilih kartu rapat untuk membuka <strong>detail rapat</strong>.</li>
+            <li>Saat rapat berlangsung dan kode hadir dibuka, masukkan kode hadir pada kolom <strong>Kode presensi hadir / pulang</strong>, lalu pilih <strong>Kirim &amp; catat absen hadir</strong>.</li>
+            <li>Setelah hadir tercatat, gunakan kolom yang sama untuk kode pulang saat kode pulang dibuka. Kirim melalui tombol absen pulang.</li>
+            <li>Pastikan status menunjukkan waktu masuk dan, setelah mengisi, waktu pulang. Satu akun hanya mencatat satu kehadiran per rapat.</li>
+        </ol>
+        <div class="two-col">
+            <div class="mini-card">
+                <h3>Mengajukan izin</h3>
+                <ol class="small">
+                    <li>Buka detail rapat yang sesuai.</li>
+                    <li>Pilih jenis izin: Sakit, Dinas, atau Keperluan lain.</li>
+                    <li>Isi alasan dan lampirkan bukti jika diminta.</li>
+                    <li>Kirim dan pantau status dari Pengelola Rapat.</li>
+                </ol>
+            </div>
+            <div class="mini-card">
+                <h3>Belum absen pulang?</h3>
+                <p class="small">Jika Anda pulang lebih dahulu, isi alasan/keterangan pada detail rapat. Jika lupa, catatan presensi akan menampilkan status belum absen pulang kepada pengelola.</p>
+            </div>
+        </div>
+        <div class="callout">
+            <strong>Waktu dan kode</strong>
+            <p class="small">Jam rapat menggunakan format 24 jam dan zona WITA. Kode masuk dan kode pulang berbeda; gunakan kode yang sesuai dengan tahap presensi dan batas waktu yang disampaikan panitia.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>12</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-guest"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 5 · Presensi publik</div>
+            <h2>Presensi tamu &amp; mahasiswa</h2>
+            <p>Formulir ini tidak memerlukan login, tetapi hanya dapat dikirim jika ada rapat yang membuka presensi.</p>
+        </header>
+        <figure class="shot-short annotated">
+            <img src="screenshots/10-presensi-mahasiswa.png" alt="Formulir presensi tamu dan mahasiswa dengan kolom NIM">
+            <figcaption>Gambar 3. Contoh formulir saat jenis peserta Mahasiswa dipilih; kolom NIM wajib diisi.</figcaption>
+            <span class="figure-pin" style="left:15%;top:25%">1</span>
+            <span class="figure-pin" style="left:15%;top:43%">2</span>
+            <span class="figure-pin" style="left:15%;top:72%">3</span>
+        </figure>
+        <div class="figure-legend">
+            <span><b class="figure-number">1</b> Pilih rapat dan jenis peserta</span>
+            <span><b class="figure-number">2</b> Isi nama, asal, serta NIM mahasiswa</span>
+            <span><b class="figure-number">3</b> Kode presensi dan kirim</span>
+        </div>
+        <ol class="steps">
+            <li>Buka <strong>Presensi Tamu &amp; Mahasiswa</strong> dari dashboard atau alamat formulir yang diberikan panitia.</li>
+            <li>Pilih rapat yang dihadiri. Pilihan hanya tersedia saat presensi rapat dibuka.</li>
+            <li>Pilih jenis peserta. Untuk <strong>Mahasiswa</strong>, isi NIM; untuk <strong>Tamu / undangan</strong>, isi nama dan asal instansi.</li>
+            <li>Masukkan kode yang diberikan panitia, periksa kembali pilihan rapat dan identitas, lalu pilih <strong>Kirim presensi</strong>.</li>
+            <li>Untuk absen pulang, isi formulir yang sama dengan identitas yang sama dan kode pulang.</li>
+        </ol>
+        <div class="callout warning">
+            <strong>Tombol kirim belum aktif?</strong>
+            <p class="small">Belum ada rapat yang membuka presensi. Tanyakan kepada panitia kapan kode/absen dibuka. Formulir tidak dapat mencatat kehadiran sebelum rapat tersedia dan kode yang benar dimasukkan.</p>
+        </div>
+        <p class="small">Jika identitas sudah pernah tercatat, sistem menolak presensi ganda untuk orang yang sama pada rapat tersebut. Pastikan ejaan nama, asal, jenis peserta, dan NIM benar.</p>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>13</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-manager"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 6 · Pengelola Rapat</div>
+            <h2>Membuat &amp; mengelola rapat</h2>
+            <p>Menu <strong>Rapat</strong> menampilkan status, pencarian, serta tindakan sesuai hak akses akun.</p>
+        </header>
+        <figure class="shot-short annotated">
+            <img src="screenshots/06-menu-rapat.png" alt="Menu Rapat pada akun Super Admin demonstrasi">
+            <figcaption>Gambar 4. Menu Rapat akun Super Admin demonstrasi; akses pada akun Pengelola Rapat bergantung pada izin.</figcaption>
+            <span class="figure-pin" style="left:6%;top:10%">1</span>
+            <span class="figure-pin" style="left:76%;top:25%">2</span>
+            <span class="figure-pin" style="left:7%;top:47%">3</span>
+        </figure>
+        <div class="figure-legend">
+            <span><b class="figure-number">1</b> Navigasi menu administrasi</span>
+            <span><b class="figure-number">2</b> Tindakan membuat rapat</span>
+            <span><b class="figure-number">3</b> Ringkasan dan daftar rapat</span>
+        </div>
+        <ol class="steps">
+            <li>Pilih menu <strong>Rapat</strong>, lalu <strong>Buat rapat baru</strong>.</li>
+            <li>Isi judul, tanggal, waktu mulai/selesai, moda (Luring/Daring/Hybrid), ruang, agenda, pimpinan, dan notulis.</li>
+            <li>Waktu menggunakan format 24 jam, misalnya <span class="kbd">13:30</span>. Waktu selesai harus setelah waktu mulai.</li>
+            <li>Pilih rapat untuk semua pegawai atau pilih peserta per grup jurusan/unit. Buka grup, gunakan pencarian bila perlu, lalu pilih pegawai atau tombol <strong>Pilih semua pegawai dalam grup</strong>. Tombol <strong>Kosongkan pilihan grup</strong> hanya menghapus centang grup tersebut. Periksa jumlah peserta sebelum menyimpan.</li>
+            <li>Lengkapi tautan rapat daring atau pemateri bila diperlukan. Tambahkan materi/rekaman hanya jika role Anda memiliki izin.</li>
+            <li>Periksa ringkasan sebelum menyimpan. Rapat yang dibuat dapat ditemukan pada daftar dan dashboard sesuai jadwalnya.</li>
+        </ol>
+        <div class="callout">
+            <strong>Perubahan rapat</strong>
+            <p class="small">Gunakan pencarian/filter untuk menemukan rapat, lalu pilih <strong>Ubah</strong>. Menghapus rapat tidak sama dengan menyelesaikannya; tindakan hapus dapat menghapus data terkait, jadi periksa judul dan tanggal sebelum mengonfirmasi.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>14</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-codes"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 7 · Kode presensi</div>
+            <h2>Membuka kode &amp; memantau kehadiran</h2>
+            <p>Pengelolaan kode presensi hanya tersedia untuk Super Admin. Pengelola Rapat yang memiliki izin dapat meninjau daftar.</p>
+        </header>
+        <ol class="steps">
+            <li>Pada daftar rapat, pilih <strong>Atur presensi</strong> atau buka detail rapat.</li>
+            <li>Di bagian <strong>Absen masuk</strong>, masukkan kode yang akan dibagikan atau biarkan kosong agar kode dibuat otomatis. Tentukan masa aktif, lalu buka/perbarui kode.</li>
+            <li>Sampaikan kode hadir hanya kepada peserta rapat selama masa berlakunya. Perpanjang atau tutup kode dari layar yang sama bila diperlukan.</li>
+            <li>Buat kode absen pulang secara terpisah, tentukan berapa lama kode berlaku setelah rapat selesai, lalu sampaikan saat peserta akan mengisi absen pulang.</li>
+            <li>Pantau daftar absen masuk/pulang dan status kehadiran pada kartu rapat atau menu <strong>Kehadiran &amp; Izin</strong>.</li>
+        </ol>
+        <div class="callout warning">
+            <strong>Mengakhiri rapat</strong>
+            <p class="small">Tindakan <strong>Selesaikan</strong> mengakhiri rapat dan tidak dapat dibatalkan. Jika belum ada kode pulang aktif, sistem membuka kode pulang otomatis selama 30 menit. Beri tahu peserta sebelum mengakhiri rapat.</p>
+        </div>
+        <h3>Status yang perlu diperhatikan</h3>
+        <ul>
+            <li><strong>Hadir</strong>: absen masuk telah tercatat.</li>
+            <li><strong>Sudah Absen Pulang</strong>: waktu pulang tersimpan.</li>
+            <li><strong>Belum Absen Pulang</strong>: belum ada waktu pulang; minta pegawai mengisi alasan bila pulang lebih dahulu.</li>
+            <li><strong>Menunggu rapat selesai</strong>: kode/aksi pulang belum tersedia pada tahap tersebut.</li>
+        </ul>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>15</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-reports"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 8 · Kehadiran, izin, dan laporan</div>
+            <h2>Meninjau catatan &amp; mengekspor laporan</h2>
+            <p>Gunakan menu <strong>Kehadiran &amp; Izin</strong> untuk rapat selesai dan pengajuan izin pegawai.</p>
+        </header>
+        <figure class="shot-short annotated">
+            <img src="screenshots/08-daftar-kehadiran.png" alt="Halaman Kehadiran dan Izin dengan ringkasan rapat selesai dan catatan izin">
+            <figcaption>Gambar 5. Ringkasan Kehadiran &amp; Izin. Pilih rapat selesai untuk membuka rincian.</figcaption>
+            <span class="figure-pin" style="left:6%;top:13%">1</span>
+            <span class="figure-pin" style="left:6%;top:44%">2</span>
+            <span class="figure-pin" style="left:9%;top:69%">3</span>
+        </figure>
+        <div class="figure-legend">
+            <span><b class="figure-number">1</b> Menu Kehadiran &amp; Izin</span>
+            <span><b class="figure-number">2</b> Ringkasan laporan</span>
+            <span><b class="figure-number">3</b> Buka rapat selesai</span>
+        </div>
+        <ol class="steps">
+            <li>Pilih kartu rapat selesai untuk membuka rincian daftar hadir.</li>
+            <li>Pilih jenis presensi <strong>Pegawai</strong> atau <strong>Tamu / Mahasiswa</strong>.</li>
+            <li>Gunakan tombol <strong>Ekspor Excel</strong> untuk mengunduh daftar presensi sesuai jenis peserta.</li>
+            <li>Pada menu Rapat, gunakan <strong>Unduh PDF Notulen + Daftar Hadir</strong> jika laporan rapat sudah memenuhi persyaratan persetujuan tanda tangan.</li>
+        </ol>
+        <h3>Memproses izin</h3>
+        <p>Di bagian <strong>Daftar izin rapat</strong>, cari pengajuan yang berstatus <strong>Menunggu</strong>. Baca alasan dan bukti yang dilampirkan, lalu pilih <strong>Setujui</strong> atau <strong>Tolak</strong> sesuai kewenangan dan prosedur unit.</p>
+        <div class="callout">
+            <strong>Data laporan</strong>
+            <p class="small">Laporan dapat memuat nama, NIP, NIM, asal instansi, waktu masuk/pulang, dan alasan izin. Unduh dan bagikan hanya kepada pihak yang berwenang.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>16</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-minutes"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 9 · Notulen &amp; persetujuan</div>
+            <h2>Mengisi notulen &amp; tugas tanda tangan</h2>
+            <p>Jika ditugaskan sebagai pimpinan rapat atau notulis, persetujuan dilakukan menggunakan akun pegawai masing-masing.</p>
+        </header>
+        <figure class="shot-short annotated">
+            <img src="screenshots/07-detail-rapat.png" alt="Detail rapat dengan agenda, peserta, presensi, materi dan notulen">
+            <figcaption>Gambar 6. Detail rapat menampilkan agenda, presensi, materi, rekaman, dan bagian notulen sesuai hak akses.</figcaption>
+            <span class="figure-pin" style="left:7%;top:8%">1</span>
+            <span class="figure-pin" style="left:7%;top:30%">2</span>
+            <span class="figure-pin" style="left:7%;top:67%">3</span>
+        </figure>
+        <div class="figure-legend">
+            <span><b class="figure-number">1</b> Informasi inti dan jadwal</span>
+            <span><b class="figure-number">2</b> Peserta dan presensi</span>
+            <span><b class="figure-number">3</b> Materi, rekaman, dan notulen</span>
+        </div>
+        <ol class="steps">
+            <li>Buka detail rapat, lalu lengkapi bagian <strong>Notulen rapat</strong> dengan pembahasan, kesimpulan, dan tindak lanjut.</li>
+            <li>Setelah rapat selesai, pimpinan dan notulis yang ditugaskan membuka menu <strong>Tanda tangan</strong>.</li>
+            <li>Baca detail rapat dan notulen. Pilih <strong>Terima &amp; setujui</strong> hanya jika dokumen sudah diperiksa.</li>
+            <li>Setelah kedua pihak menyetujui notulen versi terbaru, laporan PDF dapat diunduh. QR pada dokumen mengarah ke halaman verifikasi aplikasi.</li>
+        </ol>
+        <div class="callout warning">
+            <strong>Perubahan dokumen</strong>
+            <p class="small">Jika isi rapat atau notulen berubah setelah persetujuan, tanda tangan untuk versi lama tidak lagi berlaku dan perlu diminta kembali. QR aplikasi adalah verifikasi internal, bukan sertifikat tanda tangan elektronik BSrE.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>17</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-superadmin"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 10 · Super Admin</div>
+            <h2>Akun, role, ruang, dan hak akses</h2>
+            <p>Menu administrasi hanya terlihat bagi akun yang memiliki kewenangan terkait.</p>
+        </header>
+        <div class="two-col">
+            <div class="mini-card">
+                <h3>Kelola pegawai</h3>
+                <ul class="small">
+                    <li>Tambah pegawai dengan nama, NIP, jabatan, dan grup jurusan/unit bila tersedia.</li>
+                    <li>Atur role: Pegawai, Pengelola Rapat, atau Super Admin.</li>
+                    <li>Pengaturan ulang sandi menggunakan minimal 8 karakter; berikan sandi baru secara pribadi kepada pegawai.</li>
+                    <li>Gunakan pencarian untuk menemukan nama, NIP, atau jabatan.</li>
+                </ul>
+            </div>
+            <div class="mini-card">
+                <h3>Hak akses pengelola</h3>
+                <ul class="small">
+                    <li>Aktifkan izin Pengelola Rapat untuk rapat, materi, rekaman, notulen, daftar hadir, dan grup undangan sesuai kebijakan.</li>
+                    <li>Izin Pengelola Rapat berlaku pada seluruh akun dengan role tersebut.</li>
+                    <li>Pengelolaan ruang hanya dapat dilakukan Super Admin; batasi jumlah akun Super Admin sesuai kebijakan institusi.</li>
+                </ul>
+            </div>
+        </div>
+        <h3>Grup undangan jurusan/unit</h3>
+        <ol class="steps">
+            <li>Pada <strong>Pegawai</strong>, atur role akun menjadi <strong>Pengelola Rapat</strong>. Pada menu <strong>Hak Akses</strong>, centang <strong>Kelola grup jurusan/unit undangan</strong>, lalu pilih <strong>Simpan Hak Akses</strong>. Izin ini berlaku untuk semua Pengelola Rapat.</li>
+            <li>Buka <strong>Grup Undangan</strong>, masukkan nama jurusan/unit baru, lalu pilih <strong>Tambah grup</strong>. Akun yang diberi grup dapat dipilih per kelompok saat rapat dibuat.</li>
+            <li>Pilih <strong>Hapus</strong> hanya bila grup memang tidak diperlukan. Pegawai tidak ikut terhapus; mereka dipindahkan ke grup <strong>Lainnya / belum dikelompokkan</strong>.</li>
+        </ol>
+        <p class="small">Akun pegawai baru dapat langsung diberi grup melalui pilihan <strong>Grup undangan</strong> pada formulir Tambah pegawai.</p>
+        <h3>Ruang &amp; pengaturan</h3>
+        <p>Menu <strong>Ruang Rapat</strong> digunakan untuk menambah ruang atau mengaktifkan/nonaktifkan ruang. Ruang nonaktif tidak dapat dipilih untuk rapat baru. Menu <strong>Pengaturan</strong> memuat pengaturan aplikasi yang hanya dapat diubah oleh Super Admin.</p>
+        <div class="callout warning">
+            <strong>Hati-hati saat menghapus</strong>
+            <p class="small">Menghapus pegawai atau rapat dapat memengaruhi presensi dan data yang terkait. Periksa identitas serta konfirmasi tindakan sebelum menyimpan.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>18</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-live-board"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 11 · Informasi publik</div>
+            <h2>Menggunakan Live Board</h2>
+            <p>Live Board dapat dibuka tanpa login untuk menampilkan rapat yang sedang berlangsung.</p>
+        </header>
+        <figure class="shot-wide annotated">
+            <img src="screenshots/04-live-board.png" alt="Live Board menampilkan rapat aktif, jam WITA, lama rapat dan jumlah hadir">
+            <figcaption>Gambar 7. Live Board ruang. Data contoh pada gambar bersifat fiktif; jumlah hadir ditampilkan tanpa daftar identitas.</figcaption>
+            <span class="figure-pin" style="left:7%;top:14%">1</span>
+            <span class="figure-pin" style="left:65%;top:37%">2</span>
+            <span class="figure-pin" style="left:65%;top:65%">3</span>
+        </figure>
+        <div class="figure-legend">
+            <span><b class="figure-number">1</b> Judul ruang/Live Board</span>
+            <span><b class="figure-number">2</b> Informasi rapat aktif</span>
+            <span><b class="figure-number">3</b> Durasi dan jumlah hadir</span>
+        </div>
+        <ol class="steps">
+            <li>Pilih Live Board dari dashboard, lalu tentukan semua ruang atau ruang yang ingin ditampilkan.</li>
+            <li>Periksa judul, rentang waktu, tempat/moda, durasi, dan jumlah hadir.</li>
+            <li>Pilih <strong>Tampilkan layar penuh</strong> untuk layar rapat/proyektor.</li>
+            <li>Data diperbarui otomatis setiap beberapa detik dan durasi rapat bergerak diperbarui setiap detik.</li>
+        </ol>
+        <div class="callout">
+            <strong>Privasi</strong>
+            <p class="small">Live Board publik menampilkan ringkasan dan jumlah hadir, bukan identitas peserta. Untuk daftar nama dan waktu presensi, gunakan menu internal dengan akun serta izin yang sesuai.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>19</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-help"></a>
+        <header class="section-head">
+            <div class="eyebrow">Bab 12 · Bantuan cepat</div>
+            <h2>Kendala umum &amp; keamanan</h2>
+        </header>
+        <table class="role-grid">
+            <thead><tr><th>Kendala</th><th>Yang dapat dilakukan</th></tr></thead>
+            <tbody>
+                <tr><td>Tidak bisa login</td><td>Periksa NIP dan kata sandi. Jika sandi awal belum diganti atau sandi terlupa, hubungi Super Admin.</td></tr>
+                <tr><td>Menu admin tidak ada</td><td>Pastikan role dan izin akun sudah diberikan. Tidak semua pegawai dapat melihat semua tab.</td></tr>
+                <tr><td>Presensi belum bisa dikirim</td><td>Pastikan rapat yang benar dipilih, kode sesuai, dan presensi sedang dibuka/belum kedaluwarsa.</td></tr>
+                <tr><td>Rapat tidak muncul</td><td>Periksa tanggal, status filter, dan pencarian. Tanyakan kepada pengelola jika jadwal seharusnya tersedia.</td></tr>
+                <tr><td>Ekspor/laporan tidak tersedia</td><td>Periksa izin akses dan status rapat. PDF notulen memerlukan persetujuan yang masih berlaku untuk versi dokumen terbaru.</td></tr>
+                <tr><td>Server lokal tidak dapat dibuka</td><td>Minta administrator memastikan layanan aplikasi, basis data, dan jaringan aktif. Alamat 127.0.0.1 hanya berlaku pada komputer server.</td></tr>
+            </tbody>
+        </table>
+        <h3>Checklist sebelum meninggalkan aplikasi</h3>
+        <ul class="checklist">
+            <li>Presensi masuk/pulang tercatat pada rapat yang benar.</li>
+            <li>Pengajuan izin memiliki keterangan yang jelas dan lampiran bila diminta.</li>
+            <li>Notulen dan tindak lanjut sudah disimpan serta diperiksa.</li>
+            <li>File ekspor hanya diberikan kepada pihak yang berwenang.</li>
+            <li>Sudah memilih <strong>Keluar</strong> pada perangkat bersama.</li>
+        </ul>
+        <div class="callout">
+            <strong>Butuh bantuan lebih lanjut?</strong>
+            <p class="small">Sampaikan kepada administrator aplikasi: halaman/menu yang digunakan, waktu kejadian, pesan yang tampil, serta langkah sebelum masalah muncul. Jangan kirim kata sandi, kode presensi, atau data pribadi melalui grup umum.</p>
+        </div>
+        <div class="cover-meta">
+            <span>Politeknik Kesehatan Kemenkes Manado</span>
+            <span>Panduan pengguna · November 2026</span>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>20</span></footer>
+    </section>
+</body>
+</html>

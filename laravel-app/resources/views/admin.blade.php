@@ -2,7 +2,7 @@
 
 @section('content')
 @php
-    $tabs = ['rapat' => 'Rapat', 'ruang' => 'Ruang Rapat', 'kehadiran' => 'Kehadiran & Izin', 'pegawai' => 'Pegawai', 'superadmin' => 'Hak Akses', 'pengaturan' => 'Pengaturan'];
+    $tabs = ['rapat' => 'Rapat', 'ruang' => 'Ruang Rapat', 'kehadiran' => 'Kehadiran & Izin', 'pegawai' => 'Pegawai', 'grup' => 'Grup Undangan', 'superadmin' => 'Hak Akses', 'pengaturan' => 'Pengaturan'];
 @endphp
 <nav class="tabs admin-menu-panel flex flex-wrap gap-2 mb-4">
     @foreach($tabs as $key => $label)
@@ -10,6 +10,7 @@
             $visible = true;
             if ($key === 'ruang') $visible = $canManageRooms;
             elseif ($key === 'kehadiran') $visible = $canViewAttendance;
+            elseif ($key === 'grup') $visible = $canManageInviteGroups;
             elseif (in_array($key, ['pegawai', 'superadmin', 'pengaturan'], true)) $visible = $canManageRoles;
         @endphp
         @if($visible)<a href="{{ route('admin', $key) }}" class="{{ $tab === $key ? 'on' : '' }}">{{ $label }}</a>@endif
@@ -42,6 +43,7 @@
                 <div><label>Nama lengkap</label><input name="nama" required placeholder="Nama sesuai identitas"></div>
                 <div><label>NIP (18 digit)</label><input name="nip" required inputmode="numeric" maxlength="18" placeholder="Masukkan NIP"></div>
                 <div><label>Jabatan / unit</label><input name="jabatan" placeholder="Jabatan atau unit kerja"></div>
+                <div><label>Grup undangan</label><select name="invite_group"><option value="">Lainnya / belum dikelompokkan</option>@foreach($inviteGroups as $group)<option value="{{ $group->group_name }}" @selected(old('invite_group') === $group->group_name)>{{ $group->group_name }}</option>@endforeach</select></div>
             </div>
             <div class="employee-add-footer"><p>Kata sandi awal dibuat dari NIP dan wajib diganti saat login pertama.</p><button class="btn pri">Simpan pegawai</button></div>
         </form>
@@ -72,7 +74,7 @@
                     @if($canManageRoles)
                         <form method="post" action="{{ route('admin.action') }}">
                             @csrf<input type="hidden" name="aksi" value="atur_role"><input type="hidden" name="id" value="{{ $person->id }}">
-                            <select name="role" onchange="this.form.submit()" class="btn sm" style="cursor:pointer;padding:5px 10px;border-radius:8px;background:#fff;{{ $person->is_admin ? 'border-color:var(--teal-d);font-weight:600;color:var(--teal-d);' : '' }}" aria-label="Pilih role untuk {{ $person->nama }}">
+                            <select name="role" onchange="this.form.submit()" class="btn sm {{ $person->is_admin ? 'admin-role-select' : '' }}" style="cursor:pointer;padding:5px 10px;border-radius:8px;background:#fff" aria-label="Pilih role untuk {{ $person->nama }}">
                                 <option value="pegawai" {{ (!$person->is_admin && !$person->is_super_admin) ? 'selected' : '' }}>Pegawai</option>
                                 <option value="admin" {{ ($person->is_admin && !$person->is_super_admin) ? 'selected' : '' }}>Pengelola Rapat</option>
                                 <option value="super_admin" {{ $person->is_super_admin ? 'selected' : '' }}>Super Admin</option>
@@ -194,9 +196,79 @@
                 <input type="checkbox" name="lihat_daftar_hadir" value="1" @checked($managerAccessSettings->lihat_daftar_hadir) style="width:auto;margin:0;">
                 <span>Presensi &amp; Kehadiran</span>
             </label>
+            <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
+                <input type="checkbox" name="kelola_grup_undangan" value="1" @checked($managerAccessSettings->kelola_grup_undangan) style="width:auto;margin:0;">
+                <span>Kelola grup jurusan/unit undangan</span>
+            </label>
         </div>
         <button class="btn pri mt-3">Simpan Hak Akses</button>
     </form>
+
+@elseif($tab === 'grup')
+    @php($assignedEmployeeCount = $inviteGroups->where('group_name', '!=', 'Lainnya / belum dikelompokkan')->sum('employee_count'))
+    <div class="invite-group-page">
+        <header class="invite-group-hero">
+            <div>
+                <span class="invite-group-eyebrow">Pengaturan undangan</span>
+                <h2>Grup jurusan &amp; unit</h2>
+                <p>Kelompokkan pegawai agar lebih mudah memilih peserta saat membuat rapat.</p>
+            </div>
+            <div class="invite-group-overview" aria-label="Ringkasan grup undangan">
+                <div><b>{{ $inviteGroups->count() - 1 }}</b><span>grup aktif</span></div>
+                <div><b>{{ $assignedEmployeeCount }}</b><span>pegawai dikelompokkan</span></div>
+            </div>
+        </header>
+
+        <form method="post" action="{{ route('admin.action') }}" class="invite-group-create">
+            @csrf
+            <input type="hidden" name="aksi" value="tambah_grup_undangan">
+            <div class="invite-group-create-copy">
+                <span class="invite-group-create-icon" aria-hidden="true">+</span>
+                <div>
+                    <h3>Tambah grup baru</h3>
+                    <p>Tambahkan jurusan atau unit yang belum tersedia.</p>
+                </div>
+            </div>
+            <div class="invite-group-create-fields">
+                <label class="sr-only" for="invite-group-name">Nama jurusan atau unit</label>
+                <input id="invite-group-name" name="group_name" value="{{ old('group_name') }}" required maxlength="150" placeholder="Contoh: Teknologi Laboratorium Medis">
+                <button class="btn pri"><span aria-hidden="true">+</span> Tambah grup</button>
+            </div>
+            @error('group_name')<p class="invite-group-error" role="alert">{{ $message }}</p>@enderror
+        </form>
+
+        <div class="invite-group-list-heading">
+            <div>
+                <h3>Daftar grup</h3>
+                <p>Pegawai tetap tersimpan jika grup dihapus.</p>
+            </div>
+            <span class="invite-group-total">{{ $inviteGroups->count() }} grup</span>
+        </div>
+        <div class="invite-group-grid">
+            @foreach($inviteGroups as $group)
+                @php($isDefaultGroup = $group->group_name === 'Lainnya / belum dikelompokkan')
+                <article class="invite-group-card {{ $isDefaultGroup ? 'is-default' : '' }}">
+                    <div class="invite-group-card-main">
+                        <span class="invite-group-card-icon" aria-hidden="true">{{ $isDefaultGroup ? '…' : '▦' }}</span>
+                        <div class="invite-group-card-copy">
+                            <h4>{{ $group->group_name }}</h4>
+                            <p><b>{{ $group->employee_count }}</b> pegawai</p>
+                        </div>
+                    </div>
+                    @if($isDefaultGroup)
+                        <span class="invite-group-default-badge">Grup bawaan</span>
+                    @else
+                        <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Hapus grup ini? Pegawainya tetap tersimpan dan dipindahkan ke grup Lainnya.')">
+                            @csrf
+                            <input type="hidden" name="aksi" value="hapus_grup_undangan">
+                            <input type="hidden" name="id" value="{{ $group->id }}">
+                            <button class="invite-group-delete" aria-label="Hapus grup {{ $group->group_name }}">Hapus</button>
+                        </form>
+                    @endif
+                </article>
+            @endforeach
+        </div>
+    </div>
 
 @elseif($tab === 'ruang')
     <h2>Master ruang rapat</h2>
@@ -502,7 +574,7 @@
                             <h3>{{ $meeting->id ? 'Perbarui informasi rapat' : 'Siapkan jadwal rapat' }}</h3>
                             <p>Lengkapi detail utama, peserta, dan informasi pendukung rapat.</p>
                         </div>
-                        <span>Kode presensi dikelola Pengelola Rapat</span>
+                        <span>Kode presensi dikelola Super Admin</span>
                     </div>
                     <form method="post" action="{{ route('admin.action') }}" enctype="multipart/form-data" class="meeting-create-form">
                         @csrf

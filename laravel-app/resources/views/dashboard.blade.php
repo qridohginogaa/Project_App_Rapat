@@ -1,29 +1,18 @@
 @extends('layouts.app', ['title' => 'Dashboard Rapat'])
 
 @section('content')
-<section class="dashboard-hero">
-    <p>Poltekkes Kemenkes Manado</p>
-    <h2>Jadwal rapat</h2>
-    <span>Pantau rapat yang akan datang dan sedang berlangsung.</span>
-</section>
-@unless($canSeeMeetings)
-    <a class="dashboard-guest-attendance" href="{{ route('guest-attendance') }}">
-        <span class="dashboard-guest-attendance-icon" aria-hidden="true">✓</span>
-        <span class="dashboard-guest-attendance-copy">
-            <small class="dashboard-guest-attendance-label">FORMULIR ONLINE</small>
-            <b>Presensi Tamu &amp; Mahasiswa</b>
-            <small>Catat kehadiran rapat dengan mudah dan cepat.</small>
-        </span>
-        <span class="dashboard-guest-attendance-action">Isi presensi <span aria-hidden="true">→</span></span>
-    </a>
-@endunless
-<div class="dashboard-stats grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-    @foreach(['akan' => 'Akan datang', 'berlangsung' => 'Sedang berlangsung'] as $key => $label)
-        <div class="stat"><b>{{ $meetingsByStatus[$key]->count() }}</b><span>{{ $label }}</span></div>
-    @endforeach
-    @if($canSeeMeetings)<div class="stat"><b>{{ $meetingsByStatus['selesai']->count() }}</b><span>Selesai</span></div>@endif
+<div class="dashboard-intro">
+    <section class="dashboard-hero">
+        <p>Poltekkes Kemenkes Manado</p>
+        <h2>Jadwal rapat</h2>
+        <span>Pantau rapat yang akan datang dan sedang berlangsung.</span>
+    </section>
+    <div class="calendar-clock dashboard-intro-clock">
+        <span class="mu">Waktu Manado (WITA)</span>
+        <time id="manado-clock" class="calendar-time">--:--:--</time>
+        <span id="manado-date" class="mu"></span>
+    </div>
 </div>
-
 @foreach([
     'akan' => ['Rapat akan datang', 'Tidak ada rapat yang akan datang.'],
     'berlangsung' => ['Rapat sedang berlangsung', 'Tidak ada rapat yang sedang berlangsung.'],
@@ -158,12 +147,11 @@
 </section>
 @endif
 
-<section class="box calendar-box grid grid-cols-1 gap-4 mt-6 lg:grid-cols-2" aria-labelledby="calendar-title">
-    <div class="calendar-clock">
-        <span class="mu">Waktu Manado (WITA)</span>
-        <time id="manado-clock" class="calendar-time">--:--:--</time>
-        <span id="manado-date" class="mu"></span>
-    </div>
+<section class="box calendar-box mt-6" aria-labelledby="calendar-title"
+    data-calendar-events='@json($calendarEvents)'
+    data-calendar-holidays='@json($indonesianHolidays)'
+    data-calendar-can-open="{{ $canSeeMeetings ? 'true' : 'false' }}"
+    data-meeting-url="{{ route('meetings.show', ['meeting' => '__ID__']) }}">
     <div class="calendar-content">
         <div class="calendar-heading flex flex-wrap justify-between items-center gap-3">
             <div>
@@ -188,9 +176,11 @@
 </section>
 <script>
 (function () {
-    var events = @js($calendarEvents);
-    var holidaysByYear = @js($indonesianHolidays);
-    var canOpen = @js($canSeeMeetings);
+    var calendar = document.querySelector('.calendar-box');
+    var events = JSON.parse(calendar.dataset.calendarEvents);
+    var holidaysByYear = JSON.parse(calendar.dataset.calendarHolidays);
+    var canOpen = calendar.dataset.calendarCanOpen === 'true';
+    var meetingUrl = calendar.dataset.meetingUrl;
     var grid = document.getElementById('calendar-grid');
     var monthLabel = document.getElementById('calendar-month');
     var eventList = document.getElementById('calendar-events');
@@ -263,7 +253,7 @@
                         });
                         if (canOpen) selectedEvents.forEach(function (event) {
                             var link = document.createElement('a');
-                            link.href = @js(route('meetings.show', ['meeting' => '__ID__'])).replace('__ID__', encodeURIComponent(event.id));
+                            link.href = meetingUrl.replace('__ID__', encodeURIComponent(event.id));
                             link.textContent = event.title;
                             eventList.appendChild(link);
                         });

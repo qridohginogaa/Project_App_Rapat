@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 
 class PortalController extends Controller
 {
+    private const DEFAULT_INVITE_GROUP = 'Lainnya / belum dikelompokkan';
+
     private function isEmployeeAdmin(?object $employee): bool
     {
         return $employee && DB::table('admin_pegawai')->where('pegawai_id', $employee->id)->exists();
@@ -23,6 +25,15 @@ class PortalController extends Controller
             ->where('pegawai_id', $employee->id)
             ->where('is_super_admin', 1)
             ->exists();
+    }
+
+    private function isLastSuperAdmin(int $employeeId): bool
+    {
+        return DB::table('super_admin_permissions')
+            ->where('pegawai_id', $employeeId)
+            ->where('is_super_admin', true)
+            ->exists()
+            && DB::table('super_admin_permissions')->where('is_super_admin', true)->count() <= 1;
     }
 
     private function isAdminMode(): bool
@@ -72,6 +83,7 @@ class PortalController extends Controller
             'notulen'           => false,
             'lihat_daftar_hadir'=> false,
             'kelola_ruang'      => false,
+            'kelola_grup_undangan' => false,
         ];
 
         if (!$employee || !$this->isEmployeeAdmin($employee)) {
@@ -93,6 +105,24 @@ class PortalController extends Controller
         }
 
         return $permissions;
+    }
+
+    private function employeeInviteList()
+    {
+        return DB::table('pegawai as p')
+            ->leftJoin('pegawai_invite_groups as g', 'g.pegawai_id', '=', 'p.id')
+            ->select('p.id', 'p.nip', 'p.nama', 'p.jabatan')
+            ->selectRaw('COALESCE(NULLIF(g.group_name, \'\'), ?) as invite_group', [self::DEFAULT_INVITE_GROUP])
+            ->orderBy('invite_group')
+            ->orderBy('p.nama')
+            ->get();
+    }
+
+    private function inviteGroups()
+    {
+        return DB::table('pegawai_invite_group_catalog')
+            ->orderBy('group_name')
+            ->get();
     }
 
     private function redirectToDashboard(string $anchor = ''): \Illuminate\Http\RedirectResponse
@@ -150,6 +180,7 @@ class PortalController extends Controller
             'activeRole' => session('active_role', 'pegawai'),
             'canManageRoles' => $this->isSuperAdminMode(),
             'canManageRooms' => $this->isSuperAdminMode(),
+            'canManageInviteGroups' => $permissions['kelola_grup_undangan'],
             'canCreateMeetings' => $this->isSuperAdminMode() || $permissions['buat_rapat'],
             'canUploadMaterials' => $this->isSuperAdminMode() || $permissions['materi'],
             'canAddRecordings' => $this->isSuperAdminMode() || $permissions['rekaman'],
@@ -161,7 +192,6 @@ class PortalController extends Controller
             'calendarEvents' => $calendarEvents,
             'indonesianHolidays' => config('indonesian_holidays'),
             'rooms' => DB::table('ruang_rapat')->where('aktif', 1)->orderBy('nama')->get(),
-            'employees' => DB::table('pegawai')->select('id', 'nip', 'nama', 'jabatan')->orderBy('nama')->get(),
         ]);
     }
 
@@ -383,7 +413,7 @@ class PortalController extends Controller
             true
         );
 
-        return redirect('/#pencarianPegawai')->with('success', 'Rapat berhasil ditambahkan. Kode presensi dikelola Pengelola Rapat.');
+        return redirect('/#pencarianPegawai')->with('success', 'Rapat berhasil ditambahkan. Kode presensi dikelola Super Admin.');
     }
 
     public function liveBoard(Request $request)
@@ -824,6 +854,9 @@ class PortalController extends Controller
         if (in_array($tab, ['superadmin', 'pegawai', 'pengaturan'], true)) {
             abort_unless($isSuperAdmin, 403);
         }
+        if ($tab === 'grup') {
+            abort_unless($isSuperAdmin || $permissions['kelola_grup_undangan'], 403);
+        }
         if ($tab === 'ruang') {
             abort_unless($isSuperAdmin, 403);
         }
@@ -842,6 +875,7 @@ class PortalController extends Controller
             'canManageRoles' => $isSuperAdmin,
             'canCreateMeetings' => $isSuperAdmin || $permissions['buat_rapat'],
             'canManageRooms' => $isSuperAdmin,
+            'canManageInviteGroups' => $isSuperAdmin || $permissions['kelola_grup_undangan'],
             'canViewAttendance' => $isSuperAdmin || $permissions['lihat_daftar_hadir'],
             'canEditMinutes' => $isSuperAdmin || $permissions['notulen'],
             'canManageMaterials' => $isSuperAdmin || $permissions['materi'],
@@ -849,6 +883,7 @@ class PortalController extends Controller
         ];
 
         if ($tab === 'pegawai') {
+            $data['inviteGroups'] = $this->inviteGroups();
             $data['employees'] = DB::table('pegawai')
                 ->select('pegawai.*')
                 ->selectSub(
@@ -886,6 +921,17 @@ class PortalController extends Controller
                 ->orderBy('p.nama')
                 ->get();
             $data['managerAccessSettings'] = DB::table('manager_access_settings')->where('id', 1)->first();
+        } elseif ($tab === 'grup') {
+            $groupCounts = DB::table('pegawai_invite_groups')
+                ->select('group_name')
+                ->selectRaw('COUNT(*) as employee_count')
+                ->groupBy('group_name');
+            $data['inviteGroups'] = DB::table('pegawai_invite_group_catalog as groups')
+                ->leftJoinSub($groupCounts, 'counts', 'counts.group_name', '=', 'groups.group_name')
+                ->select('groups.id', 'groups.group_name')
+                ->selectRaw('COALESCE(counts.employee_count, 0) as employee_count')
+                ->orderBy('groups.group_name')
+                ->get();
         } elseif ($tab === 'ruang') {
             $data['rooms'] = DB::table('ruang_rapat')->orderByDesc('aktif')->orderBy('nama')->get();
         } elseif ($tab === 'kehadiran') {
@@ -943,7 +989,8 @@ class PortalController extends Controller
             $data['editMeeting'] = $request->filled('edit')
                 ? DB::table('rapat')->where('id', $request->integer('edit'))->first()
                 : null;
-            $data['employees'] = DB::table('pegawai')->select('id', 'nip', 'nama', 'jabatan')->orderBy('nama')->get();
+            $data['employees'] = $this->employeeInviteList();
+            $data['inviteGroups'] = $this->inviteGroups();
             $data['participantIds'] = $data['editMeeting']
                 ? DB::table('meeting_participants')->where('rapat_id', $data['editMeeting']->id)->pluck('pegawai_id')->map(fn ($id) => (string) $id)->all()
                 : [];
@@ -977,13 +1024,22 @@ class PortalController extends Controller
                     'nama' => ['required', 'string', 'max:150'],
                     'nip' => ['required', 'regex:/^\d{18}$/', 'unique:pegawai,nip'],
                     'jabatan' => ['nullable', 'string', 'max:150'],
+                    'invite_group' => ['nullable', 'string', 'max:150', 'exists:pegawai_invite_group_catalog,group_name'],
                 ]);
-                DB::table('pegawai')->insert([
-                    'nama' => trim($data['nama']), 'nip' => $data['nip'],
-                    'jabatan' => $data['jabatan'] ?: 'Pegawai',
-                    'password_hash' => Hash::make($data['nip']),
-                    'password_change_required' => true,
-                ]);
+                DB::transaction(function () use ($data) {
+                    $pegawaiId = DB::table('pegawai')->insertGetId([
+                        'nama' => trim($data['nama']), 'nip' => $data['nip'],
+                        'jabatan' => $data['jabatan'] ?: 'Pegawai',
+                        'password_hash' => Hash::make($data['nip']),
+                        'password_change_required' => true,
+                    ]);
+                    if (!empty($data['invite_group'])) {
+                        DB::table('pegawai_invite_groups')->insert([
+                            'pegawai_id' => $pegawaiId,
+                            'group_name' => $data['invite_group'],
+                        ]);
+                    }
+                });
                 return redirect()->route('admin', 'pegawai')->with('status', 'Pegawai berhasil ditambahkan. Kata sandi awal menggunakan NIP dan wajib diganti saat login pertama.');
 
             case 'atur_password_pegawai':
@@ -1014,6 +1070,9 @@ class PortalController extends Controller
                 abort_unless($employee !== null, 404);
 
                 if ($data['role'] === 'admin') {
+                    if ($this->isLastSuperAdmin($id)) {
+                        return back()->withErrors(['role' => 'Tidak dapat menurunkan Super Admin terakhir. Tetapkan Super Admin lain terlebih dahulu.']);
+                    }
                     DB::table('super_admin_permissions')->where('pegawai_id', $id)->delete();
                     DB::table('admin_pegawai')->updateOrInsert(['pegawai_id' => $id]);
                     return redirect()->route('admin', 'pegawai')->with('status', "Role {$employee->nama} berhasil diubah menjadi Pengelola Rapat.");
@@ -1036,6 +1095,9 @@ class PortalController extends Controller
                     return redirect()->route('admin', 'superadmin')->with('status', "{$employee->nama} ditingkatkan menjadi Super Admin.");
                 }
 
+                if ($this->isLastSuperAdmin($id)) {
+                    return back()->withErrors(['role' => 'Tidak dapat menurunkan Super Admin terakhir. Tetapkan Super Admin lain terlebih dahulu.']);
+                }
                 DB::table('admin_pegawai')->where('pegawai_id', $id)->delete();
                 DB::table('super_admin_permissions')->where('pegawai_id', $id)->delete();
                 return redirect()->route('admin', 'pegawai')->with('status', "Role untuk {$employee->nama} berhasil diubah menjadi Pegawai.");
@@ -1064,6 +1126,9 @@ class PortalController extends Controller
                     return redirect()->route('admin', 'superadmin')->with('status', 'Pengelola Rapat ditingkatkan menjadi Super Admin.');
                 }
 
+                if ($this->isLastSuperAdmin($id)) {
+                    return back()->withErrors(['super_admin' => 'Tidak dapat mencabut Super Admin terakhir. Tetapkan Super Admin lain terlebih dahulu.']);
+                }
                 DB::table('super_admin_permissions')->where('pegawai_id', $id)->delete();
                 return redirect()->route('admin', 'superadmin')->with('status', 'Role Super Admin dicabut; akun tetap menjadi Pengelola Rapat.');
 
@@ -1087,10 +1152,39 @@ class PortalController extends Controller
                     'rekaman'           => $request->boolean('rekaman'),
                     'notulen'           => $request->boolean('notulen'),
                     'lihat_daftar_hadir'=> $request->boolean('lihat_daftar_hadir'),
+                    'kelola_grup_undangan' => $request->boolean('kelola_grup_undangan'),
                 ];
 
                 DB::table('manager_access_settings')->where('id', 1)->update($perms);
                 return redirect()->route('admin', 'superadmin')->with('status', 'Hak akses global Pengelola Rapat berhasil diperbarui.');
+
+            case 'tambah_grup_undangan':
+                abort_unless($this->isSuperAdminMode() || $permissions['kelola_grup_undangan'], 403);
+                $data = $request->validate([
+                    'group_name' => ['required', 'string', 'max:150'],
+                ]);
+                $groupName = trim($data['group_name']);
+                if (mb_strtolower($groupName) === 'pensiun') {
+                    return back()->withErrors(['group_name' => 'Grup Pensiun tidak dapat ditambahkan.'])->withInput();
+                }
+                if (DB::table('pegawai_invite_group_catalog')->whereRaw('LOWER(group_name) = ?', [mb_strtolower($groupName)])->exists()) {
+                    return back()->withErrors(['group_name' => 'Nama grup sudah tersedia.'])->withInput();
+                }
+                DB::table('pegawai_invite_group_catalog')->insert(['group_name' => $groupName]);
+                return redirect()->route('admin', 'grup')->with('status', 'Grup undangan berhasil ditambahkan.');
+
+            case 'hapus_grup_undangan':
+                abort_unless($this->isSuperAdminMode() || $permissions['kelola_grup_undangan'], 403);
+                $group = DB::table('pegawai_invite_group_catalog')->where('id', $id)->first();
+                abort_unless($group !== null, 404);
+                abort_unless($group->group_name !== self::DEFAULT_INVITE_GROUP, 422, 'Grup bawaan tidak dapat dihapus.');
+                DB::transaction(function () use ($group) {
+                    DB::table('pegawai_invite_groups')
+                        ->where('group_name', $group->group_name)
+                        ->update(['group_name' => self::DEFAULT_INVITE_GROUP]);
+                    DB::table('pegawai_invite_group_catalog')->where('id', $group->id)->delete();
+                });
+                return redirect()->route('admin', 'grup')->with('status', 'Grup dihapus. Pegawai tetap tersimpan dan dipindahkan ke grup Lainnya / belum dikelompokkan.');
 
             case 'jadikan_super_admin':
                 abort_unless($this->isSuperAdminMode(), 403);
@@ -1122,13 +1216,23 @@ class PortalController extends Controller
 
             case 'hapus_super_admin':
                 abort_unless($this->isSuperAdminMode(), 403);
+                if ($this->isLastSuperAdmin($id)) {
+                    return back()->withErrors(['role' => 'Tidak dapat menghapus Super Admin terakhir. Tetapkan Super Admin lain terlebih dahulu.']);
+                }
                 DB::table('super_admin_permissions')->where('pegawai_id', $id)->delete();
                 DB::table('admin_pegawai')->where('pegawai_id', $id)->delete();
                 return redirect()->route('admin', 'superadmin')->with('status', 'Role Pengelola Rapat pegawai berhasil dicabut.');
 
             case 'hapus_pegawai':
                 abort_unless($this->isSuperAdminMode(), 403);
-                DB::table('pegawai')->where('id', $id)->delete();
+                $employee = DB::table('pegawai')->where('id', $id)->first();
+                abort_unless($employee !== null, 404);
+                if ($this->isLastSuperAdmin($id)) {
+                    return back()->withErrors(['pegawai' => 'Tidak dapat menghapus Super Admin terakhir. Tetapkan Super Admin lain terlebih dahulu.']);
+                }
+                $files = DB::table('kehadiran')->where('pegawai_id', $id)->whereNotNull('file')->pluck('file');
+                DB::transaction(fn () => DB::table('pegawai')->where('id', $id)->delete());
+                $this->deleteUnreferencedMeetingUploads($files);
                 return redirect()->route('admin', 'pegawai')->with('status', 'Pegawai berhasil dihapus.');
 
             case 'simpan_ruang':
@@ -1168,15 +1272,11 @@ class PortalController extends Controller
                 abort_unless($this->isSuperAdminMode() || $permissions['buat_rapat'], 403);
                 $meeting = DB::table('rapat')->where('id', $id)->first();
                 abort_unless($meeting !== null, 404);
-                foreach ([$meeting->file_notulen, $meeting->materi_rapat] as $file) {
-                    if ($file) {
-                        Storage::disk('meeting_uploads')->delete($file);
-                    }
-                }
-                foreach (DB::table('berkas_rapat')->where('rapat_id', $id)->whereNotNull('nama_file')->pluck('nama_file') as $file) {
-                    Storage::disk('meeting_uploads')->delete($file);
-                }
-                DB::table('rapat')->where('id', $id)->delete();
+                $files = collect([$meeting->file_notulen, $meeting->materi_rapat])
+                    ->merge(DB::table('berkas_rapat')->where('rapat_id', $id)->whereNotNull('nama_file')->pluck('nama_file'))
+                    ->merge(DB::table('kehadiran')->where('rapat_id', $id)->whereNotNull('file')->pluck('file'));
+                DB::transaction(fn () => DB::table('rapat')->where('id', $id)->delete());
+                $this->deleteUnreferencedMeetingUploads($files);
                 return redirect()->route('admin', 'rapat')->with('status', 'Rapat berhasil dihapus.');
 
             case 'atur_presensi':
@@ -1359,7 +1459,14 @@ class PortalController extends Controller
     {
         $meeting = DB::table('rapat')->where('id', $id)->first();
         abort_unless($meeting !== null, 404);
-        $option = $request->string('opsi_presensi')->toString();
+        $data = $request->validate([
+            'opsi_presensi' => ['required', 'in:buat,perbarui,tutup,tambah_waktu,buat_pulang,tutup_pulang'],
+            'kode' => ['nullable', 'string', 'max:20'],
+            'durasi' => ['nullable', 'in:15,30,60,selesai,kustom'],
+            'menit_kustom' => ['nullable', 'integer', 'between:1,1440'],
+            'menit' => ['nullable', 'integer', 'between:1,1440'],
+        ]);
+        $option = $data['opsi_presensi'];
         $isCheckout = str_ends_with($option, '_pulang');
         if (MeetingData::scheduleStatus($meeting) === 'selesai' && !$isCheckout) {
             return redirect()->route('admin', ['tab' => 'rapat', 'presensi' => $id])
@@ -1367,15 +1474,15 @@ class PortalController extends Controller
         }
 
         if (in_array($option, ['buat', 'perbarui'], true)) {
-            $duration = $request->input('durasi', '30');
+            $duration = $data['durasi'] ?? '30';
             if ($duration === 'selesai') {
                 $expires = $meeting->tanggal.' '.$meeting->selesai;
             } else {
-                $minutes = $duration === 'kustom' ? max(1, $request->integer('menit_kustom', 30)) : max(1, (int) $duration);
+                $minutes = $duration === 'kustom' ? (int) ($data['menit_kustom'] ?? 30) : (int) $duration;
                 $expires = now()->addMinutes($minutes)->toDateTimeString();
             }
             DB::table('rapat')->where('id', $id)->update([
-                'kode_presensi' => strtoupper(trim((string) $request->input('kode'))) ?: MeetingData::code(),
+                'kode_presensi' => strtoupper(trim($data['kode'] ?? '')) ?: MeetingData::code(),
                 'presensi_kedaluwarsa' => $expires,
                 'presensi_diperpanjang' => 0,
             ]);
@@ -1387,7 +1494,7 @@ class PortalController extends Controller
                     ? \Illuminate\Support\Carbon::parse($meeting->presensi_kedaluwarsa, config('app.timezone'))
                     : now();
                 $base = $expiry->gt(now()) ? $expiry : now();
-                $minutes = max(1, $request->integer('menit', 15));
+                $minutes = (int) ($data['menit'] ?? 15);
                 DB::table('rapat')->where('id', $id)->update([
                     'presensi_kedaluwarsa' => $base->addMinutes($minutes)->toDateTimeString(),
                     'presensi_diperpanjang' => 1,
@@ -1396,8 +1503,7 @@ class PortalController extends Controller
                 return back()->withErrors(['presensi' => 'Batas perpanjangan presensi hanya satu kali.']);
             }
         } elseif ($option === 'buat_pulang') {
-            $data = $request->validate([
-                'kode' => ['nullable', 'string', 'max:20'],
+            $checkoutData = $request->validate([
                 'durasi' => ['required', 'in:15,30,60'],
             ]);
             $code = strtoupper(trim($data['kode'] ?? '')) ?: MeetingData::code();
@@ -1408,7 +1514,7 @@ class PortalController extends Controller
             $expires = $meetingEnd->greaterThan(now()) ? $meetingEnd : now();
             DB::table('rapat')->where('id', $id)->update([
                 'kode_presensi_pulang' => $code,
-                'presensi_pulang_kedaluwarsa' => $expires->copy()->addMinutes((int) $data['durasi']),
+                'presensi_pulang_kedaluwarsa' => $expires->copy()->addMinutes((int) $checkoutData['durasi']),
             ]);
         } elseif ($option === 'tutup_pulang') {
             DB::table('rapat')->where('id', $id)->update(['presensi_pulang_kedaluwarsa' => now()]);
@@ -1828,9 +1934,11 @@ class PortalController extends Controller
     {
         $this->requireEmployeeOrAdmin();
         abort_unless(basename($filename) === $filename, 404);
+        $isLeaveAttachment = DB::table('kehadiran')->where('file', $filename)->exists();
+        abort_unless(!$isLeaveAttachment || $this->isAdminMode(), 403);
         $registered = DB::table('rapat')->where('file_notulen', $filename)->orWhere('materi_rapat', $filename)->exists()
             || DB::table('berkas_rapat')->where('nama_file', $filename)->exists()
-            || DB::table('kehadiran')->where('file', $filename)->exists();
+            || $isLeaveAttachment;
         abort_unless($registered && Storage::disk('meeting_uploads')->exists($filename), 404);
 
         $download = request()->boolean('download');
@@ -1855,5 +1963,18 @@ class PortalController extends Controller
     {
         $extension = strtolower($file->getClientOriginalExtension());
         return $file->storeAs('', Str::random(32).'.'.$extension, 'meeting_uploads');
+    }
+
+    private function deleteUnreferencedMeetingUploads(iterable $filenames): void
+    {
+        foreach (collect($filenames)->filter()->unique() as $filename) {
+            $isRegistered = DB::table('rapat')->where('file_notulen', $filename)->orWhere('materi_rapat', $filename)->exists()
+                || DB::table('berkas_rapat')->where('nama_file', $filename)->exists()
+                || DB::table('kehadiran')->where('file', $filename)->exists();
+
+            if (!$isRegistered) {
+                Storage::disk('meeting_uploads')->delete($filename);
+            }
+        }
     }
 }

@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Support\EmployeeRosterImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PortalTest extends TestCase
@@ -92,6 +94,15 @@ class PortalTest extends TestCase
         );
     }
 
+    public function test_super_admin_dashboard_shows_invite_group_navigation(): void
+    {
+        $this->withSession($this->superAdminSession())
+            ->get('/')
+            ->assertOk()
+            ->assertSee('Grup Undangan')
+            ->assertSee('href="'.route('admin', 'grup').'"', false);
+    }
+
     public function test_dashboard_calendar_includes_official_national_holidays_and_collective_leave(): void
     {
         $this->get('/')
@@ -106,6 +117,99 @@ class PortalTest extends TestCase
             ->assertSee('2027-12-26')
             ->assertSee('Isra Mikraj Nabi Muhammad saw.')
             ->assertSee('https://setneg.go.id/baca/index/inilah_skb_3_menteri_libur_nasional_dan_cuti_bersama_2026');
+    }
+
+    public function test_meeting_invite_picker_groups_employees_by_unit(): void
+    {
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Keperawatan',
+            'jabatan' => 'Dosen',
+            'password_hash' => Hash::make('password-tes'),
+        ]);
+        DB::table('pegawai_invite_groups')->insert([
+            'pegawai_id' => $employeeId,
+            'group_name' => 'Keperawatan',
+        ]);
+        DB::table('pegawai_invite_group_catalog')->insert(['group_name' => 'Keperawatan']);
+
+        $this->withSession($this->superAdminSession())
+            ->get('/admin/rapat?edit=0')
+            ->assertOk()
+            ->assertSee('Keperawatan')
+            ->assertSee('Pilih semua pegawai dalam grup')
+            ->assertSee('Kosongkan pilihan grup')
+            ->assertSee('Pegawai Keperawatan');
+    }
+
+    public function test_employee_roster_import_only_adds_missing_employees_and_group_metadata(): void
+    {
+        $existingId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Nama Lama',
+            'jabatan' => 'Jabatan Lama',
+            'password_hash' => Hash::make('password-lama'),
+        ]);
+
+        $importer = new EmployeeRosterImporter;
+        $records = [
+            [
+                'nip' => '123456789012345678',
+                'nama' => 'Nama Baru Dari Sumber',
+                'jabatan' => 'Jabatan Baru Dari Sumber',
+                'group_name' => 'Keperawatan',
+            ],
+            [
+                'nip' => '876543210987654321',
+                'nama' => 'Pegawai Baru',
+                'jabatan' => 'Dosen',
+                'group_name' => 'Farmasi',
+            ],
+            [
+                'nip' => '987654321098765432',
+                'nama' => 'Pegawai Pensiun',
+                'jabatan' => 'Pegawai',
+                'group_name' => 'Pensiun',
+            ],
+        ];
+
+        $this->assertSame([
+            'employees_added' => 1,
+            'employees_existing' => 1,
+            'groups_added' => 2,
+            'employees_skipped' => 1,
+        ], $importer->import($records));
+
+        $this->assertDatabaseHas('pegawai', [
+            'id' => $existingId,
+            'nip' => '123456789012345678',
+            'nama' => 'Nama Lama',
+            'jabatan' => 'Jabatan Lama',
+        ]);
+        $this->assertDatabaseHas('pegawai_invite_groups', [
+            'pegawai_id' => $existingId,
+            'group_name' => 'Keperawatan',
+        ]);
+
+        $newEmployee = DB::table('pegawai')->where('nip', '876543210987654321')->first();
+        $this->assertSame('Pegawai Baru', $newEmployee->nama);
+        $this->assertTrue((bool) $newEmployee->password_change_required);
+        $this->assertTrue(Hash::check('876543210987654321', $newEmployee->password_hash));
+        $this->assertDatabaseHas('pegawai_invite_groups', [
+            'pegawai_id' => $newEmployee->id,
+            'group_name' => 'Farmasi',
+        ]);
+        $this->assertDatabaseHas('pegawai_invite_group_catalog', [
+            'group_name' => 'Farmasi',
+        ]);
+        $this->assertDatabaseMissing('pegawai', ['nip' => '987654321098765432']);
+
+        $this->assertSame([
+            'employees_added' => 0,
+            'employees_existing' => 2,
+            'groups_added' => 0,
+            'employees_skipped' => 1,
+        ], $importer->import($records));
     }
 
     public function test_dashboard_offers_guest_attendance_for_an_active_meeting(): void
@@ -123,8 +227,7 @@ class PortalTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('Presensi Tamu & Mahasiswa')
-            ->assertSee('FORMULIR ONLINE')
-            ->assertSee('Isi presensi')
+            ->assertSee('class="btn top-guest-attendance"', false)
             ->assertSee(route('guest-attendance'));
 
         $this->get(route('guest-attendance'))
@@ -1026,6 +1129,43 @@ class PortalTest extends TestCase
             ->assertRedirect(route('employee.password'));
     }
 
+    public function test_employee_with_required_password_change_cannot_access_admin_exports_or_files(): void
+    {
+        $passwordHash = Hash::make('kata-sandi-sementara');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Super Admin Belum Ganti Sandi',
+            'jabatan' => 'Administrator',
+            'password_hash' => $passwordHash,
+            'password_change_required' => true,
+        ]);
+        DB::table('admin_pegawai')->insert(['pegawai_id' => $employeeId]);
+        DB::table('super_admin_permissions')->insert([
+            'pegawai_id' => $employeeId,
+            'is_super_admin' => true,
+        ]);
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+            'active_role' => 'super_admin',
+        ];
+
+        $this->withUntrustedSession($session)->get('/admin/superadmin')
+            ->assertRedirect(route('employee.password'));
+        $this->withUntrustedSession($session)->post('/admin/actions', [
+            'aksi' => 'hapus_pegawai',
+            'id' => 999,
+        ])->assertRedirect(route('employee.password'));
+        $this->withUntrustedSession($session)->get('/admin/attendance/1/pegawai/export')
+            ->assertRedirect(route('employee.password'));
+        $this->withUntrustedSession($session)->get('/meetings/1/minutes-attendance/export')
+            ->assertRedirect(route('employee.password'));
+        $this->withUntrustedSession($session)->get('/files/meeting-document.pdf')
+            ->assertRedirect(route('employee.password'));
+        $this->withUntrustedSession($session)->post('/role/switch', ['role' => 'pegawai'])
+            ->assertRedirect(route('employee.password'));
+    }
+
     public function test_employee_can_finish_required_password_change_and_cannot_change_it_again(): void
     {
         $employeeId = DB::table('pegawai')->insertGetId([
@@ -1095,6 +1235,93 @@ class PortalTest extends TestCase
         $employee = DB::table('pegawai')->where('id', $employeeId)->first();
         $this->assertTrue((bool) $employee->password_change_required);
         $this->assertTrue(password_verify('sandi-reset', $employee->password_hash));
+    }
+
+    public function test_deleting_meetings_or_employees_removes_unreferenced_leave_attachments(): void
+    {
+        Storage::fake('meeting_uploads');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Penghapus',
+            'jabatan' => 'Dosen',
+        ]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat dengan lampiran izin',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $meetingAttachment = 'meeting-leave-proof.pdf';
+        Storage::disk('meeting_uploads')->put($meetingAttachment, 'attachment');
+        DB::table('kehadiran')->insert([
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $employeeId,
+            'status' => 'izin',
+            'file' => $meetingAttachment,
+        ]);
+
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'hapus_rapat',
+            'id' => $meetingId,
+        ])->assertRedirect('/admin/rapat');
+        Storage::disk('meeting_uploads')->assertMissing($meetingAttachment);
+
+        $secondMeetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat pegawai dengan lampiran',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '11:00',
+            'selesai' => '12:00',
+            'moda' => 'Luring',
+        ]);
+        $employeeAttachment = 'employee-leave-proof.pdf';
+        Storage::disk('meeting_uploads')->put($employeeAttachment, 'attachment');
+        DB::table('kehadiran')->insert([
+            'rapat_id' => $secondMeetingId,
+            'pegawai_id' => $employeeId,
+            'status' => 'izin',
+            'file' => $employeeAttachment,
+        ]);
+
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'hapus_pegawai',
+            'id' => $employeeId,
+        ])->assertRedirect('/admin/pegawai');
+        Storage::disk('meeting_uploads')->assertMissing($employeeAttachment);
+        $this->assertDatabaseHas('rapat', ['id' => $secondMeetingId]);
+    }
+
+    public function test_leave_attachments_are_only_accessible_to_meeting_managers(): void
+    {
+        Storage::fake('meeting_uploads');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Biasa',
+            'jabatan' => 'Dosen',
+            'password_hash' => Hash::make('password-tes'),
+        ]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat lampiran izin',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $filename = 'leave-proof-private.pdf';
+        Storage::disk('meeting_uploads')->put($filename, 'private attachment');
+        DB::table('kehadiran')->insert([
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $employeeId,
+            'status' => 'izin',
+            'file' => $filename,
+        ]);
+        $employeeSession = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
+        ];
+
+        $this->withSession($employeeSession)->get('/files/'.$filename)->assertForbidden();
+        $this->withSession($this->superAdminSession())->get('/files/'.$filename)->assertOk();
     }
 
     public function test_meeting_manager_cannot_manage_employee_accounts(): void
@@ -1379,6 +1606,37 @@ class PortalTest extends TestCase
             'employee_password_hash' => $passwordHash,
         ])->get('/meetings/1')
             ->assertRedirect('/employee/password');
+    }
+
+    public function test_last_super_admin_cannot_be_demoted_or_deleted(): void
+    {
+        $session = $this->superAdminSession();
+        $employeeId = $session['employee_id'];
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'atur_role',
+            'id' => $employeeId,
+            'role' => 'admin',
+        ])->assertSessionHasErrors('role');
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'atur_role_super_admin',
+            'id' => $employeeId,
+            'super_admin' => '0',
+        ])->assertSessionHasErrors('super_admin');
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'hapus_super_admin',
+            'id' => $employeeId,
+        ])->assertSessionHasErrors('role');
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'hapus_pegawai',
+            'id' => $employeeId,
+        ])->assertSessionHasErrors('pegawai');
+
+        $this->assertDatabaseHas('super_admin_permissions', [
+            'pegawai_id' => $employeeId,
+            'is_super_admin' => 1,
+        ]);
+        $this->assertDatabaseHas('pegawai', ['id' => $employeeId]);
     }
 
     public function test_admin_can_manage_employee_super_admin_role_and_job_title(): void
@@ -2221,6 +2479,7 @@ class PortalTest extends TestCase
             'buat_rapat' => '1',
             'rekaman' => '1',
             'lihat_daftar_hadir' => '1',
+            'kelola_grup_undangan' => '1',
         ])->assertRedirect('/admin/superadmin');
 
         $this->assertDatabaseHas('manager_access_settings', [
@@ -2230,6 +2489,7 @@ class PortalTest extends TestCase
             'rekaman' => 1,
             'notulen' => 0,
             'lihat_daftar_hadir' => 1,
+            'kelola_grup_undangan' => 1,
         ]);
 
         $this->withSession(['admin_id' => 1])->post('/admin/actions', [
@@ -2246,6 +2506,81 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('Pegawai Super Admin Tes')
             ->assertSee('Akses penuh');
+    }
+
+    public function test_group_management_permission_controls_group_creation_and_deletion(): void
+    {
+        $managerPassword = Hash::make('manager-password');
+        $managerId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pengelola Grup',
+            'jabatan' => 'Pengelola',
+            'password_hash' => $managerPassword,
+        ]);
+        DB::table('admin_pegawai')->insert(['pegawai_id' => $managerId]);
+        $managerSession = [
+            'employee_id' => $managerId,
+            'employee_password_hash' => $managerPassword,
+            'active_role' => 'admin',
+        ];
+
+        $this->withSession($managerSession)->get('/admin/grup')->assertForbidden();
+        $this->withSession($managerSession)->post('/admin/actions', [
+            'aksi' => 'tambah_grup_undangan',
+            'group_name' => 'Teknologi Laboratorium Medis',
+        ])->assertForbidden();
+
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'atur_hak_akses_admin',
+            'kelola_grup_undangan' => '1',
+        ])->assertRedirect('/admin/superadmin');
+
+        $this->withSession($managerSession)->get('/admin/grup')
+            ->assertOk()
+            ->assertSee('Grup jurusan &amp; unit', false)
+            ->assertSee('Tambah grup');
+        $this->withSession($managerSession)->get('/')
+            ->assertOk()
+            ->assertSee('Grup Undangan')
+            ->assertSee('href="'.route('admin', 'grup').'"', false);
+        $this->withSession($managerSession)->post('/admin/actions', [
+            'aksi' => 'tambah_grup_undangan',
+            'group_name' => 'Pensiun',
+        ])->assertSessionHasErrors('group_name');
+        $this->withSession($managerSession)->post('/admin/actions', [
+            'aksi' => 'tambah_grup_undangan',
+            'group_name' => 'Teknologi Laboratorium Medis',
+        ])->assertRedirect('/admin/grup');
+
+        $this->withSession(['admin_id' => 1])->get('/admin/rapat?edit=0')
+            ->assertOk()
+            ->assertSee('Teknologi Laboratorium Medis')
+            ->assertSee('0 pegawai');
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'tambah_pegawai',
+            'nama' => 'Dosen Laboratorium',
+            'nip' => '987654321098765432',
+            'jabatan' => 'Dosen',
+            'invite_group' => 'Teknologi Laboratorium Medis',
+        ])->assertRedirect('/admin/pegawai');
+        $employeeId = DB::table('pegawai')->where('nip', '987654321098765432')->value('id');
+        $groupId = DB::table('pegawai_invite_group_catalog')
+            ->where('group_name', 'Teknologi Laboratorium Medis')
+            ->value('id');
+
+        $this->withSession($managerSession)->post('/admin/actions', [
+            'aksi' => 'hapus_grup_undangan',
+            'id' => $groupId,
+        ])->assertRedirect('/admin/grup');
+
+        $this->assertDatabaseMissing('pegawai_invite_group_catalog', [
+            'group_name' => 'Teknologi Laboratorium Medis',
+        ]);
+        $this->assertDatabaseHas('pegawai', ['id' => $employeeId, 'nama' => 'Dosen Laboratorium']);
+        $this->assertDatabaseHas('pegawai_invite_groups', [
+            'pegawai_id' => $employeeId,
+            'group_name' => 'Lainnya / belum dikelompokkan',
+        ]);
     }
 
     public function test_global_attendance_permission_applies_to_every_meeting_manager(): void
@@ -2265,6 +2600,43 @@ class PortalTest extends TestCase
                 'active_role' => 'admin',
             ])->get('/admin/kehadiran')->assertOk();
         }
+    }
+
+    public function test_attendance_code_options_and_duration_are_validated(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Validasi Kode',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $session = $this->superAdminSession();
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'atur_presensi',
+            'id' => $meetingId,
+            'opsi_presensi' => 'unknown',
+        ])->assertSessionHasErrors('opsi_presensi');
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'atur_presensi',
+            'id' => $meetingId,
+            'opsi_presensi' => 'buat',
+            'durasi' => '999999999',
+        ])->assertSessionHasErrors('durasi');
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'atur_presensi',
+            'id' => $meetingId,
+            'opsi_presensi' => 'buat',
+            'kode' => str_repeat('A', 21),
+        ])->assertSessionHasErrors('kode');
+
+        $this->assertDatabaseHas('rapat', [
+            'id' => $meetingId,
+            'kode_presensi' => null,
+        ]);
     }
 
     public function test_meeting_manager_cannot_create_or_manage_attendance_codes(): void
