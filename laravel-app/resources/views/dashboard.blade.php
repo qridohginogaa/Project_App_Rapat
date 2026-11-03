@@ -42,7 +42,7 @@
                     @php($previewRoom = $rooms->first(fn ($room) => mb_strtolower(trim(preg_replace('/\s+room$/i', '', $room->nama))) === $meetingRoomName))
                 @endif
                 <div class="mt {{ $scheduleStatus === 'berlangsung' ? 'hari' : $scheduleStatus }}{{ $key === 'akan' ? ' upcoming-slide' : '' }}{{ $key === 'selesai' ? ' completed-meeting-card' : '' }}{{ $key === 'selesai' && $loop->iteration > 3 ? ' hidden' : '' }}" @if($key === 'akan')data-upcoming-slide @endif @if($key === 'selesai')data-completed-meeting @if($loop->iteration > 3)hidden @endif @endif>
-                    <a class="meeting-card-main {{ $canSeeMeetings ? '' : 'mt-static' }}" @if($canSeeMeetings) href="{{ route('meetings.show', $meeting->id) }}" @endif>
+                    <a class="meeting-card-main" href="{{ route('meetings.canonical', $meeting->meeting_slug) }}">
                         <div class="jam">{{ substr($meeting->mulai, 0, 5) }}<small>{{ substr($meeting->selesai, 0, 5) }}</small></div>
                         <div class="grow">
                             <b>{{ $meeting->judul }}</b>
@@ -130,7 +130,7 @@
     <section class="box mt-5">
         <b>Menunggu konfirmasi kehadiran Anda ({{ $waiting->count() }})</b>
         @foreach($waiting as $meeting)
-            <p class="mt-2"><a href="{{ route('meetings.show', $meeting->id) }}">{{ $meeting->judul }}</a> <span class="mu">· {{ \App\Support\MeetingData::date($meeting->tanggal) }}</span></p>
+            <p class="mt-2"><a href="{{ route('meetings.canonical', $meeting->meeting_slug) }}">{{ $meeting->judul }}</a> <span class="mu">· {{ \App\Support\MeetingData::date($meeting->tanggal) }}</span></p>
         @endforeach
     </section>
 @endif
@@ -151,7 +151,7 @@
     data-calendar-events='@json($calendarEvents)'
     data-calendar-holidays='@json($indonesianHolidays)'
     data-calendar-can-open="{{ $canSeeMeetings ? 'true' : 'false' }}"
-    data-meeting-url="{{ route('meetings.show', ['meeting' => '__ID__']) }}">
+    data-meeting-url="{{ url('/meet-__SLUG__') }}">
     <div class="calendar-content">
         <div class="calendar-heading flex flex-wrap justify-between items-center gap-3">
             <div>
@@ -253,7 +253,7 @@
                         });
                         if (canOpen) selectedEvents.forEach(function (event) {
                             var link = document.createElement('a');
-                            link.href = meetingUrl.replace('__ID__', encodeURIComponent(event.id));
+                            link.href = meetingUrl.replace('__SLUG__', encodeURIComponent(event.slug));
                             link.textContent = event.title;
                             eventList.appendChild(link);
                         });

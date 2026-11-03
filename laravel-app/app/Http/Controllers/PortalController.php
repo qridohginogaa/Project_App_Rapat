@@ -153,6 +153,7 @@ class PortalController extends Controller
             ->orderBy('r.tanggal')
             ->orderBy('r.mulai')
             ->get();
+        MeetingData::assignSlugs($meetings);
 
         $byStatus = ['akan' => collect(), 'berlangsung' => collect(), 'selesai' => collect()];
         $waiting = collect();
@@ -165,7 +166,7 @@ class PortalController extends Controller
         }
         $byStatus['selesai'] = $byStatus['selesai']->sortByDesc(fn ($meeting) => $meeting->tanggal.$meeting->mulai)->values();
         $calendarEvents = $meetings->filter(fn ($meeting) => $employee || $this->isAdminMode() || MeetingData::scheduleStatus($meeting) !== 'selesai')
-            ->map(fn ($meeting) => ['date' => $meeting->tanggal, 'title' => $meeting->judul, 'id' => (int) $meeting->id])
+            ->map(fn ($meeting) => ['date' => $meeting->tanggal, 'title' => $meeting->judul, 'id' => (int) $meeting->id, 'slug' => $meeting->meeting_slug])
             ->values();
         $permissions = $this->superAdminPermissions($employee);
 
@@ -191,7 +192,7 @@ class PortalController extends Controller
             'waiting' => $waiting,
             'calendarEvents' => $calendarEvents,
             'indonesianHolidays' => config('indonesian_holidays'),
-            'rooms' => DB::table('ruang_rapat')->where('aktif', 1)->orderBy('nama')->get(),
+            'rooms' => DB::table('ruang_rapat')->orderBy('nama')->get(),
         ]);
     }
 
@@ -359,10 +360,10 @@ class PortalController extends Controller
         abort_unless($this->isSuperAdminMode() || $permissions['materi'] || !$request->hasFile('materi'), 403);
         abort_unless($this->isSuperAdminMode() || $permissions['rekaman'] || empty($data['link_rekaman']), 403);
         $room = !empty($data['room_id'])
-            ? DB::table('ruang_rapat')->where('id', $data['room_id'])->where('aktif', 1)->first()
+            ? DB::table('ruang_rapat')->where('id', $data['room_id'])->first()
             : null;
         if (!empty($data['room_id']) && !$room) {
-            return back()->withErrors(['room_id' => 'Pilih ruang rapat yang aktif.'])->withInput();
+            return back()->withErrors(['room_id' => 'Pilih ruang rapat yang tersedia.'])->withInput();
         }
         $material = $request->file('materi');
         $materialFilename = $material ? $this->storeUpload($material) : null;
@@ -418,7 +419,7 @@ class PortalController extends Controller
 
     public function liveBoard(Request $request)
     {
-        $rooms = DB::table('ruang_rapat')->where('aktif', 1)->orderBy('nama')->get();
+        $rooms = DB::table('ruang_rapat')->orderBy('nama')->get();
         $roomId = $request->query('room_id');
         $selectedRoom = null;
 
@@ -437,7 +438,7 @@ class PortalController extends Controller
         $room = null;
         if ($roomId !== null) {
             abort_unless(filter_var($roomId, FILTER_VALIDATE_INT) !== false, 404);
-            $room = DB::table('ruang_rapat')->where('id', (int) $roomId)->where('aktif', 1)->first();
+            $room = DB::table('ruang_rapat')->where('id', (int) $roomId)->first();
             abort_unless($room !== null, 404);
         }
 
@@ -600,6 +601,14 @@ class PortalController extends Controller
         );
     }
 
+    public function exportMeetingReportBySlug(string $meetingSlug)
+    {
+        $meeting = MeetingData::findBySlug($meetingSlug);
+        abort_unless($meeting !== null, 404);
+
+        return $this->exportMeetingReport((int) $meeting->id);
+    }
+
     public function signatureInbox()
     {
         $employee = $this->employee();
@@ -610,8 +619,10 @@ class PortalController extends Controller
             ->orderByDesc('r.tanggal')
             ->orderByDesc('r.mulai')
             ->get([
+                'r.id as id',
                 's.id',
                 's.rapat_id',
+                'r.room_id',
                 's.peran',
                 's.status',
                 's.disetujui_pada',
@@ -863,7 +874,6 @@ class PortalController extends Controller
         if ($tab === 'kehadiran') {
             abort_unless($isSuperAdmin || $permissions['lihat_daftar_hadir'], 403);
         }
-
         $data = [
             'tab' => $tab,
             'employee' => $employee ?: null,
@@ -933,7 +943,14 @@ class PortalController extends Controller
                 ->orderBy('groups.group_name')
                 ->get();
         } elseif ($tab === 'ruang') {
-            $data['rooms'] = DB::table('ruang_rapat')->orderByDesc('aktif')->orderBy('nama')->get();
+            $data['rooms'] = DB::table('ruang_rapat as rooms')
+                ->select('rooms.*')
+                ->selectSub(
+                    DB::table('rapat')->selectRaw('COUNT(*)')->whereColumn('rapat.room_id', 'rooms.id'),
+                    'meeting_count'
+                )
+                ->orderBy('rooms.nama')
+                ->get();
         } elseif ($tab === 'kehadiran') {
             $data['completedMeetings'] = DB::table('rapat')->orderByDesc('tanggal')->orderByDesc('mulai')->get()
                 ->filter(fn ($meeting) => MeetingData::scheduleStatus($meeting) === 'selesai')
@@ -973,6 +990,7 @@ class PortalController extends Controller
                 ->get();
         } elseif ($tab === 'rapat') {
             $data['meetings'] = DB::table('rapat')->orderByDesc('tanggal')->orderByDesc('mulai')->get();
+            MeetingData::assignSlugs($data['meetings']);
             $data['meetingAttendees'] = DB::table('kehadiran as k')
                 ->join('pegawai as p', 'p.id', '=', 'k.pegawai_id')
                 ->whereIn('k.rapat_id', $data['meetings']->pluck('id'))
@@ -1241,10 +1259,26 @@ class PortalController extends Controller
                 DB::table('ruang_rapat')->insert(['nama' => trim($data['nama'])]);
                 return redirect()->route('admin', 'ruang')->with('status', 'Ruang rapat berhasil ditambahkan.');
 
-            case 'toggle_ruang':
+            case 'ubah_ruang':
                 abort_unless($this->isSuperAdminMode(), 403);
-                DB::table('ruang_rapat')->where('id', $id)->update(['aktif' => DB::raw('1-aktif')]);
-                return redirect()->route('admin', 'ruang');
+                $room = DB::table('ruang_rapat')->where('id', $id)->first();
+                abort_unless($room !== null, 404);
+                $request->merge(['nama' => trim((string) $request->input('nama'))]);
+                $data = $request->validate([
+                    'nama' => ['required', 'string', 'max:120', 'unique:ruang_rapat,nama,'.$id],
+                ]);
+                DB::table('ruang_rapat')->where('id', $id)->update(['nama' => $data['nama']]);
+                return redirect()->route('admin', 'ruang')->with('status', 'Nama ruang rapat berhasil diubah.');
+
+            case 'hapus_ruang':
+                abort_unless($this->isSuperAdminMode(), 403);
+                $room = DB::table('ruang_rapat')->where('id', $id)->first();
+                abort_unless($room !== null, 404);
+                DB::transaction(function () use ($id) {
+                    DB::table('rapat')->where('room_id', $id)->update(['room_id' => null]);
+                    DB::table('ruang_rapat')->where('id', $id)->delete();
+                });
+                return redirect()->route('admin', 'ruang')->with('status', 'Ruang rapat berhasil dihapus. Lokasi pada data rapat lama tetap disimpan.');
 
             case 'simpan_rapat':
                 abort_unless($this->isSuperAdminMode() || $permissions['buat_rapat'], 403);
@@ -1380,9 +1414,6 @@ class PortalController extends Controller
         $old = $id ? DB::table('rapat')->where('id', $id)->first() : null;
         abort_if($id && !$old, 404);
         $room = !empty($data['room_id']) ? DB::table('ruang_rapat')->where('id', $data['room_id'])->first() : null;
-        if ($room && !$room->aktif && (int) ($old->room_id ?? 0) !== (int) $room->id) {
-            return back()->withErrors(['room_id' => 'Ruang nonaktif hanya dapat dipertahankan pada rapat yang sudah menggunakannya.'])->withInput();
-        }
         $chairId = isset($data['pimpinan_pegawai_id']) ? (int) $data['pimpinan_pegawai_id'] : null;
         $minuteTakerId = isset($data['notulis_pegawai_id']) ? (int) $data['notulis_pegawai_id'] : null;
         $signerIds = array_values(array_filter([$chairId, $minuteTakerId]));
@@ -1685,6 +1716,34 @@ class PortalController extends Controller
                 ->get(),
             'minutesDraft' => MeetingData::minutesDraft($record, $attendees),
         ]);
+    }
+
+    public function meetingBySlug(Request $request, string $meetingSlug)
+    {
+        $meeting = MeetingData::findBySlug($meetingSlug);
+        abort_unless($meeting !== null, 404);
+
+        if ($this->employee() || $this->isAdminMode()) {
+            return $this->meeting($request, (int) $meeting->id);
+        }
+
+        return view('meeting-participants', [
+            'meeting' => $meeting,
+            'meetingParticipants' => DB::table('meeting_participants as mp')
+                ->join('pegawai as p', 'p.id', '=', 'mp.pegawai_id')
+                ->where('mp.rapat_id', $meeting->id)
+                ->select('p.nama')
+                ->orderBy('p.nama')
+                ->get(),
+        ]);
+    }
+
+    public function meetingParticipants(int $meeting)
+    {
+        $record = DB::table('rapat')->where('id', $meeting)->first();
+        abort_unless($record !== null, 404);
+
+        return redirect()->route('meetings.canonical', MeetingData::slug($record));
     }
 
     public function meetingAction(Request $request, int $meeting)

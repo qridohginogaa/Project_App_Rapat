@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 final class MeetingData
 {
@@ -22,6 +23,92 @@ final class MeetingData
         $ends = \Illuminate\Support\Carbon::parse(data_get($meeting, 'tanggal').' '.data_get($meeting, 'selesai'), $timezone);
 
         return now()->lt($starts) ? 'akan' : (now()->lt($ends) ? 'berlangsung' : 'selesai');
+    }
+
+    public static function slug(array|object $meeting): string
+    {
+        $date = (string) data_get($meeting, 'tanggal');
+        $month = substr($date, 0, 7);
+        $roomSlug = self::roomSlug($meeting);
+        $number = 0;
+
+        foreach (self::meetingsInMonth($month) as $candidate) {
+            if (self::roomSlug($candidate) === $roomSlug) {
+                $number++;
+            }
+            if ((int) $candidate->id === (int) data_get($meeting, 'id')) {
+                break;
+            }
+        }
+
+        return $month.'-'.$roomSlug.'-'.sprintf('%02d', max(1, $number));
+    }
+
+    public static function assignSlugs(iterable $meetings): void
+    {
+        $meetings = collect($meetings);
+        $roomNames = DB::table('ruang_rapat')
+            ->whereIn('id', $meetings->pluck('room_id')->filter()->unique())
+            ->pluck('nama', 'id');
+        $counts = [];
+
+        foreach ($meetings->sortBy('id') as $meeting) {
+            if (!data_get($meeting, 'room_name') && data_get($meeting, 'room_id')) {
+                $meeting->room_name = $roomNames->get(data_get($meeting, 'room_id'));
+            }
+            $month = substr((string) data_get($meeting, 'tanggal'), 0, 7);
+            $roomSlug = self::roomSlug($meeting);
+            $key = $month.'-'.$roomSlug;
+            $counts[$key] = ($counts[$key] ?? 0) + 1;
+            $meeting->meeting_slug = $key.'-'.sprintf('%02d', $counts[$key]);
+        }
+    }
+
+    public static function findBySlug(string $slug): ?object
+    {
+        if (!preg_match('/^(\d{4}-\d{2})-([a-z0-9-]+)-(\d{2,})$/', $slug, $matches)) {
+            return null;
+        }
+
+        [, $month, $roomSlug, $number] = $matches;
+        [, $monthNumber] = explode('-', $month);
+        if ((int) $monthNumber < 1 || (int) $monthNumber > 12) {
+            return null;
+        }
+
+        $currentNumber = 0;
+        foreach (self::meetingsInMonth($month) as $meeting) {
+            if (self::roomSlug($meeting) !== $roomSlug) {
+                continue;
+            }
+
+            $currentNumber++;
+            if ($currentNumber === (int) $number) {
+                return $meeting;
+            }
+        }
+
+        return null;
+    }
+
+    private static function meetingsInMonth(string $month)
+    {
+        return DB::table('rapat as r')
+            ->leftJoin('ruang_rapat as room', 'room.id', '=', 'r.room_id')
+            ->whereBetween('r.tanggal', [$month.'-01', \Illuminate\Support\Carbon::parse($month.'-01')->endOfMonth()->toDateString()])
+            ->orderBy('r.id')
+            ->select('r.*', 'room.nama as room_name')
+            ->get();
+    }
+
+    private static function roomSlug(array|object $meeting): string
+    {
+        $roomName = data_get($meeting, 'tempat');
+        if (!$roomName && data_get($meeting, 'room_id')) {
+            $roomName = DB::table('ruang_rapat')->where('id', data_get($meeting, 'room_id'))->value('nama');
+        }
+
+        return Str::slug((string) ($roomName ?: data_get($meeting, 'tempat') ?: 'umum')) ?: 'umum';
     }
 
     public static function attendanceOpen(array|object $meeting): bool

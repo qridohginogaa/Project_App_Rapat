@@ -20,7 +20,7 @@
         @if($showMeetingAdminTools || $canExportMeetingReport || $meeting->link_meeting)
             <div class="meeting-detail-hero-actions">
                 @if($meeting->link_meeting)<a class="btn pri sm" href="{{ $meeting->link_meeting }}" target="_blank" rel="noopener">Buka tautan meeting <span aria-hidden="true">↗</span></a>@endif
-                @if($canExportMeetingReport)<a class="btn sm" href="{{ route('meetings.report.export', $meeting->id) }}">Unduh PDF Notulen + Daftar Hadir</a>@endif
+                @if($canExportMeetingReport)<a class="btn sm" href="{{ route('meetings.report.canonical', \App\Support\MeetingData::slug($meeting)) }}">Unduh PDF Notulen + Daftar Hadir</a>@endif
                 @if($showMeetingAdminTools)<a class="btn sm meeting-detail-manage" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">Kelola presensi</a>@endif
                 @if($showMeetingAdminTools && \App\Support\MeetingData::canManuallyEnd($meeting))
                     <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">

@@ -16,6 +16,15 @@ Route::post('/employee/logout', [PortalController::class, 'employeeLogout'])->na
 Route::post('/meetings', [PortalController::class, 'createMeeting'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.create');
 Route::get('/guest-attendance', [PortalController::class, 'guestAttendanceForm'])->name('guest-attendance');
 Route::post('/guest-attendance', [PortalController::class, 'registerGuestAttendance'])->middleware('throttle:60,1')->name('guest-attendance.store');
+Route::get('/meet-{meetingSlug}', [PortalController::class, 'meetingBySlug'])
+    ->middleware(RequireChangedEmployeePassword::class)
+    ->where('meetingSlug', '\d{4}-\d{2}-[a-z0-9-]+-\d{2,}')
+    ->name('meetings.canonical');
+Route::get('/meet-{meetingSlug}/minutes-attendance/export', [PortalController::class, 'exportMeetingReportBySlug'])
+    ->middleware(RequireChangedEmployeePassword::class)
+    ->where('meetingSlug', '\d{4}-\d{2}-[a-z0-9-]+-\d{2,}')
+    ->name('meetings.report.canonical');
+Route::get('/meetings/{meeting}/participants', [PortalController::class, 'meetingParticipants'])->whereNumber('meeting')->name('meetings.participants');
 Route::get('/meetings/{meeting}', [PortalController::class, 'meeting'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.show');
 Route::get('/meetings/{meeting}/minutes-attendance/export', [PortalController::class, 'exportMeetingReport'])
     ->middleware(RequireChangedEmployeePassword::class)

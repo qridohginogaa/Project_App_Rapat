@@ -272,13 +272,31 @@
 
 @elseif($tab === 'ruang')
     <h2>Master ruang rapat</h2>
-    <p class="mu">Ruang nonaktif tetap tersedia untuk rapat lama.</p>
+    <p class="mu">Semua ruang yang ditambahkan langsung tersedia untuk rapat. Menghapus ruang akan memutus kaitannya dengan rapat lama, tetapi nama lokasi rapat tetap tersimpan.</p>
     <form method="post" action="{{ route('admin.action') }}" class="box">@csrf<input type="hidden" name="aksi" value="simpan_ruang">
         <label class="mt-0">Nama ruang rapat</label>
         <div class="flex flex-wrap items-center gap-2"><input class="grow" name="nama" required maxlength="120" placeholder="Contoh: Ruang Manado"><button class="btn pri">+ Tambah ruang</button></div>
     </form>
-    <div class="tw"><table><thead><tr><th>Nama ruang</th><th>Status</th><th></th></tr></thead><tbody>
-        @foreach($rooms as $room)<tr><td>{{ $room->nama }}</td><td>{{ $room->aktif ? 'Aktif' : 'Nonaktif' }}</td><td><form method="post" action="{{ route('admin.action') }}">@csrf<input type="hidden" name="aksi" value="toggle_ruang"><input type="hidden" name="id" value="{{ $room->id }}"><button class="btn sm">{{ $room->aktif ? 'Nonaktifkan' : 'Aktifkan' }}</button></form></td></tr>@endforeach
+    <div class="tw"><table><thead><tr><th>Nama ruang</th><th>Digunakan rapat</th><th>Aksi</th></tr></thead><tbody>
+        @foreach($rooms as $room)
+            <tr>
+                <td>
+                    <form method="post" action="{{ route('admin.action') }}" class="flex flex-wrap items-center gap-2">
+                        @csrf
+                        <input type="hidden" name="aksi" value="ubah_ruang">
+                        <input type="hidden" name="id" value="{{ $room->id }}">
+                        <input name="nama" value="{{ $room->nama }}" required maxlength="120" aria-label="Nama ruang {{ $room->nama }}">
+                        <button class="btn sm">Simpan nama</button>
+                    </form>
+                </td>
+                <td>{{ $room->meeting_count }} rapat</td>
+                <td>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Hapus ruang rapat ini? Lokasi pada rapat lama tetap disimpan.')">@csrf<input type="hidden" name="aksi" value="hapus_ruang"><input type="hidden" name="id" value="{{ $room->id }}"><button class="btn sm red">Hapus</button></form>
+                    </div>
+                </td>
+            </tr>
+        @endforeach
     </tbody></table></div>
 
 @elseif($tab === 'kehadiran')
@@ -588,7 +606,7 @@
                                 <div class="meeting-form-field"><label>Moda</label><select name="moda">@foreach(['Luring','Daring','Hybrid'] as $mode)<option @selected(old('moda', $meeting->moda) === $mode)>{{ $mode }}</option>@endforeach</select></div>
                                 <div class="meeting-form-field">@include('partials.meeting-time-select', ['name' => 'mulai', 'label' => 'Mulai', 'selectedTime' => old('mulai', substr($meeting->mulai, 0, 5))])</div>
                                 <div class="meeting-form-field">@include('partials.meeting-time-select', ['name' => 'selesai', 'label' => 'Selesai', 'selectedTime' => old('selesai', substr($meeting->selesai, 0, 5))])</div>
-                                <div class="meeting-form-field"><label>Ruang</label><select name="room_id"><option value="">Tidak memilih ruang</option>@foreach($rooms as $room)<option value="{{ $room->id }}" @selected((string) old('room_id', $meeting->room_id) === (string) $room->id)>{{ $room->nama }}{{ !$room->aktif ? ' (nonaktif)' : '' }}</option>@endforeach</select></div>
+                                <div class="meeting-form-field"><label>Ruang</label><select name="room_id"><option value="">Tidak memilih ruang</option>@foreach($rooms as $room)<option value="{{ $room->id }}" @selected((string) old('room_id', $meeting->room_id) === (string) $room->id)>{{ $room->nama }}</option>@endforeach</select></div>
                                 <div class="meeting-form-field"><label>Tempat lain</label><input name="tempat" value="{{ old('tempat', $meeting->tempat) }}"></div>
                                 <div class="meeting-form-field"><label>Tautan meeting HTTPS</label><input type="url" name="link_meeting" value="{{ old('link_meeting', $meeting->link_meeting) }}" placeholder="https://"></div>
                                 @if($canManageRecordings)
@@ -780,7 +798,7 @@
                             <div class="admin-meeting-card-actions">
                                 @if($canViewAttendance)
                                     <a class="btn sm admin-meeting-attendance" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">{{ $isSuperAdmin ? (\App\Support\MeetingData::attendanceOpen($meeting) ? 'Kode '.$meeting->kode_presensi : 'Atur presensi') : 'Lihat presensi' }}</a>
-                                    <a class="btn sm" href="{{ route('meetings.report.export', $meeting->id) }}">Unduh PDF Notulen + Daftar Hadir</a>
+                                    <a class="btn sm" href="{{ route('meetings.report.canonical', $meeting->meeting_slug) }}">Unduh PDF Notulen + Daftar Hadir</a>
                                 @endif
                                 @if($canCreateMeetings)
                                     <a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'edit' => $meeting->id]) }}">Ubah</a>

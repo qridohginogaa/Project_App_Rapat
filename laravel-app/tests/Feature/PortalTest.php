@@ -65,7 +65,7 @@ class PortalTest extends TestCase
 
     public function test_dashboard_shows_upcoming_meetings_to_visitors(): void
     {
-        DB::table('rapat')->insert([
+        $meetingId = DB::table('rapat')->insertGetId([
             'judul' => 'Rapat berikutnya',
             'tanggal' => now()->addDay()->toDateString(),
             'mulai' => '09:00',
@@ -87,11 +87,100 @@ class PortalTest extends TestCase
             ->assertSee('Live Board Siladen Room');
 
         $dashboardHtml = $this->get('/')->getContent();
+        $this->assertStringContainsString(
+            'href="'.route('meetings.canonical', \App\Support\MeetingData::slug(DB::table('rapat')->where('id', $meetingId)->first())).'"',
+            $dashboardHtml
+        );
+        $this->assertStringContainsString('data-meeting-url="'.url('/meet-__SLUG__').'"', $dashboardHtml);
+        $this->assertStringContainsString('"slug":"'.\App\Support\MeetingData::slug(DB::table('rapat')->where('id', $meetingId)->first()).'"', $dashboardHtml);
         $this->assertSame(1, substr_count($dashboardHtml, 'href="'.route('live-board').'"'));
         $this->assertLessThan(
             strpos($dashboardHtml, 'calendar-title'),
             strpos($dashboardHtml, 'Live Board Siladen Room')
         );
+    }
+
+    public function test_visitor_can_open_a_meeting_and_see_only_its_invited_employee_names(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat dengan daftar peserta',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+            'agenda' => 'Agenda internal',
+            'pimpinan' => 'Pimpinan Tes',
+            'notulis' => 'Notulis Tes',
+            'link_meeting' => 'https://zoom.us/j/123456789',
+        ]);
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Nama Peserta Tes',
+            'jabatan' => 'Dosen',
+            'password_hash' => Hash::make('password-tes'),
+        ]);
+        DB::table('meeting_participants')->insert([
+            'rapat_id' => $meetingId,
+            'pegawai_id' => $employeeId,
+        ]);
+
+        $meeting = DB::table('rapat')->where('id', $meetingId)->first();
+        $meetingSlug = \App\Support\MeetingData::slug($meeting);
+
+        $this->get(route('meetings.canonical', $meetingSlug))
+            ->assertOk()
+            ->assertSee('Peserta rapat')
+            ->assertSee('Nama Peserta Tes')
+            ->assertSee('Rapat dengan daftar peserta')
+            ->assertSee('Agenda internal')
+            ->assertSee('Pimpinan Tes')
+            ->assertSee('Notulis Tes')
+            ->assertSee('href="https://zoom.us/j/123456789"', false)
+            ->assertSee('Buka tautan meeting')
+            ->assertSee('Presensi Tamu & Mahasiswa')
+            ->assertSee(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertDontSee('Presensi rapat')
+            ->assertDontSee('NIP');
+
+        $this->get('/meetings/'.$meetingId.'/participants')
+            ->assertRedirect(route('meetings.canonical', $meetingSlug));
+    }
+
+    public function test_meeting_links_use_monthly_room_sequence_and_keep_legacy_id_links(): void
+    {
+        $meetingDate = now()->startOfMonth()->addDays(5)->toDateString();
+        $dihagaRoomId = DB::table('ruang_rapat')->where('nama', 'Dihaga Room')->value('id');
+        $bunakenRoomId = DB::table('ruang_rapat')->where('nama', 'Bunaken Room')->value('id');
+        $meetingIds = [];
+
+        foreach ([$dihagaRoomId, $bunakenRoomId, $dihagaRoomId] as $index => $roomId) {
+            $meetingIds[] = DB::table('rapat')->insertGetId([
+                'judul' => 'Rapat Slug '.($index + 1),
+                'tanggal' => $meetingDate,
+                'mulai' => '09:00',
+                'selesai' => '10:00',
+                'tempat' => DB::table('ruang_rapat')->where('id', $roomId)->value('nama'),
+                'room_id' => $roomId,
+                'moda' => 'Luring',
+            ]);
+        }
+
+        $expectedSlugs = [
+            'meet-'.substr($meetingDate, 0, 7).'-dihaga-room-01',
+            'meet-'.substr($meetingDate, 0, 7).'-bunaken-room-01',
+            'meet-'.substr($meetingDate, 0, 7).'-dihaga-room-02',
+        ];
+        foreach ($meetingIds as $index => $meetingId) {
+            $meeting = DB::table('rapat')->where('id', $meetingId)->first();
+            $this->assertSame(substr($expectedSlugs[$index], 5), \App\Support\MeetingData::slug($meeting));
+            $this->get('/'.$expectedSlugs[$index])->assertOk()->assertSee('Rapat Slug '.($index + 1));
+        }
+
+        $this->withSession($this->superAdminSession())
+            ->get('/'.$expectedSlugs[0])
+            ->assertOk()
+            ->assertSee('Rapat Slug 1')
+            ->assertSee('Presensi rapat');
     }
 
     public function test_super_admin_dashboard_shows_invite_group_navigation(): void
@@ -238,6 +327,15 @@ class PortalTest extends TestCase
             ->assertSee('Rapat yang dihadiri')
             ->assertSee('Kode presensi')
             ->assertSee('name="meeting_id"', false);
+
+        $meeting = DB::table('rapat')->where('id', $meetingId)->first();
+        $this->get(route('meetings.canonical', \App\Support\MeetingData::slug($meeting)))
+            ->assertOk()
+            ->assertSee('Presensi Tamu & Mahasiswa')
+            ->assertSee(route('guest-attendance', ['meeting_id' => $meetingId]));
+        $this->get(route('guest-attendance', ['meeting_id' => $meetingId]))
+            ->assertOk()
+            ->assertSee('<option value="'.$meetingId.'" selected>', false);
     }
 
     public function test_dashboard_hides_guest_attendance_link_for_logged_in_accounts(): void
@@ -915,8 +1013,11 @@ class PortalTest extends TestCase
             ]);
         }
 
-        $route = route('meetings.report.export', $meetingId);
+        $meetingSlug = \App\Support\MeetingData::slug(DB::table('rapat')->where('id', $meetingId)->first());
+        $route = route('meetings.report.canonical', $meetingSlug);
+        $legacyRoute = route('meetings.report.export', $meetingId);
         $this->get($route)->assertForbidden();
+        $this->get($legacyRoute)->assertForbidden();
         $this->withSession(['admin_id' => 1])->get('/admin/rapat')
             ->assertOk()
             ->assertSee($route)
@@ -926,6 +1027,9 @@ class PortalTest extends TestCase
             ->assertSee($route);
 
         $this->withSession(['admin_id' => 1])->get($route)
+            ->assertRedirect()
+            ->assertSessionHasErrors('tanda_tangan');
+        $this->withSession(['admin_id' => 1])->get($legacyRoute)
             ->assertRedirect()
             ->assertSessionHasErrors('tanda_tangan');
 
@@ -1482,7 +1586,7 @@ class PortalTest extends TestCase
         $this->assertDatabaseMissing('rapat', ['judul' => 'Rapat Jadwal Tidak Valid']);
     }
 
-    public function test_admin_cannot_assign_inactive_room_to_a_different_meeting(): void
+    public function test_rooms_are_always_available_for_meetings_regardless_of_legacy_status(): void
     {
         $roomId = DB::table('ruang_rapat')->insertGetId([
             'nama' => 'Ruang Lama Nonaktif',
@@ -1500,9 +1604,11 @@ class PortalTest extends TestCase
                 'room_id' => $roomId,
                 'semua_pegawai' => '1',
             ])
-            ->assertSessionHasErrors('room_id');
-
-        $this->assertDatabaseMissing('rapat', ['judul' => 'Rapat Ruang Nonaktif']);
+            ->assertRedirect('/admin/rapat');
+        $this->assertDatabaseHas('rapat', [
+            'judul' => 'Rapat Ruang Nonaktif',
+            'room_id' => $roomId,
+        ]);
 
         $meetingId = DB::table('rapat')->insertGetId([
             'judul' => 'Rapat Lama di Ruang Nonaktif',
@@ -2917,7 +3023,12 @@ class PortalTest extends TestCase
             'nama' => 'Ruang Khusus',
         ])->assertForbidden();
         $this->withSession($managerSession)->post('/admin/actions', [
-            'aksi' => 'toggle_ruang',
+            'aksi' => 'ubah_ruang',
+            'id' => DB::table('ruang_rapat')->value('id'),
+            'nama' => 'Tidak Diizinkan',
+        ])->assertForbidden();
+        $this->withSession($managerSession)->post('/admin/actions', [
+            'aksi' => 'hapus_ruang',
             'id' => DB::table('ruang_rapat')->value('id'),
         ])->assertForbidden();
 
@@ -2930,6 +3041,48 @@ class PortalTest extends TestCase
             'nama' => 'Ruang Super Admin',
         ])->assertRedirect('/admin/ruang');
         $this->assertSame($roomCount + 1, DB::table('ruang_rapat')->count());
+
+        $renamedRoomId = DB::table('ruang_rapat')->where('nama', 'Ruang Super Admin')->value('id');
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Ruang Uji',
+            'tanggal' => '2026-11-20',
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'tempat' => 'Ruang Super Admin',
+            'room_id' => $renamedRoomId,
+            'moda' => 'Luring',
+        ]);
+        $meeting = DB::table('rapat')->where('id', $meetingId)->first();
+        $previousSlug = \App\Support\MeetingData::slug($meeting);
+
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'ubah_ruang',
+            'id' => $renamedRoomId,
+            'nama' => 'Ruang yang Diperbarui',
+        ])->assertRedirect('/admin/ruang')->assertSessionHas('status', 'Nama ruang rapat berhasil diubah.');
+        $this->assertDatabaseHas('ruang_rapat', ['id' => $renamedRoomId, 'nama' => 'Ruang yang Diperbarui']);
+        $this->assertSame($previousSlug, \App\Support\MeetingData::slug(DB::table('rapat')->where('id', $meetingId)->first()));
+        $this->withSession(['admin_id' => 1])->get('/meet-'.$previousSlug)->assertOk()->assertSee('Rapat Ruang Uji');
+
+        $this->withSession(['admin_id' => 1])->get('/admin/ruang')
+            ->assertOk()
+            ->assertSee('Ruang yang Diperbarui')
+            ->assertSee('Simpan nama')
+            ->assertSee('1 rapat')
+            ->assertDontSee('Status</th>')
+            ->assertDontSee('Nonaktifkan')
+            ->assertDontSee('Dipakai rapat');
+        $this->withSession(['admin_id' => 1])->post('/admin/actions', [
+            'aksi' => 'hapus_ruang',
+            'id' => $renamedRoomId,
+        ])->assertRedirect('/admin/ruang')->assertSessionHas('status', 'Ruang rapat berhasil dihapus. Lokasi pada data rapat lama tetap disimpan.');
+        $this->assertDatabaseMissing('ruang_rapat', ['id' => $renamedRoomId]);
+        $this->assertDatabaseHas('rapat', [
+            'id' => $meetingId,
+            'room_id' => null,
+            'tempat' => 'Ruang Super Admin',
+        ]);
+        $this->assertSame($previousSlug, \App\Support\MeetingData::slug(DB::table('rapat')->where('id', $meetingId)->first()));
 
         $this->withSession(['admin_id' => 1])->get('/admin/superadmin')
             ->assertOk()

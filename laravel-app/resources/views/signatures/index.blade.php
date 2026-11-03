@@ -19,7 +19,7 @@
                     <span class="signature-request-role">{{ $signature->peran === 'pimpinan' ? 'PIMPINAN RAPAT' : 'NOTULIS' }}</span>
                     <h3>{{ $signature->judul }}</h3>
                     <p>{{ \App\Support\MeetingData::date($signature->tanggal) }} · {{ substr($signature->mulai, 0, 5) }}–{{ substr($signature->selesai, 0, 5) }} WITA · {{ $signature->tempat ?: 'Tempat belum ditentukan' }}</p>
-                    <a href="{{ route('meetings.show', $signature->rapat_id) }}">Lihat detail rapat</a>
+                    <a href="{{ route('meetings.canonical', \App\Support\MeetingData::slug($signature)) }}">Lihat detail rapat</a>
                 </div>
             </div>
             <div class="signature-request-action">

@@ -44,6 +44,10 @@
                     <a class="btn top-guest-attendance" href="{{ route('guest-attendance') }}">
                         Presensi Tamu &amp; Mahasiswa
                     </a>
+                @elseif(request()->routeIs('meetings.canonical') && isset($meeting))
+                    <a class="btn top-guest-attendance" href="{{ route('guest-attendance', ['meeting_id' => $meeting->id]) }}">
+                        Presensi Tamu &amp; Mahasiswa
+                    </a>
                 @endif
                 <a class="btn" href="{{ route('login') }}">Login</a>
             </nav>
