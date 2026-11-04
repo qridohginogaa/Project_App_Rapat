@@ -578,7 +578,7 @@
     </div>
 @elseif($tab === 'rapat')
     @if(request()->has('edit'))
-        @php($meeting = $editMeeting ?: (object) ['id' => 0, 'judul' => '', 'tanggal' => now()->toDateString(), 'mulai' => '09:00:00', 'selesai' => '11:00:00', 'tempat' => '', 'room_id' => null, 'link_meeting' => '', 'moda' => 'Luring', 'pimpinan' => '', 'notulis' => '', 'pemateri' => '', 'agenda' => '', 'link_rekaman' => '', 'notulen' => '', 'file_notulen' => '', 'materi_rapat' => '', 'batas_notulen_hari' => \App\Support\MeetingData::setting('batas_notulen_default_hari', '7')])
+        @php($meeting = $editMeeting ?: (object) ['id' => 0, 'judul' => '', 'tanggal' => now()->toDateString(), 'mulai' => '09:00:00', 'selesai' => '11:00:00', 'tempat' => '', 'room_id' => null, 'link_meeting' => '', 'moda' => 'Luring', 'pimpinan' => '', 'notulis' => '', 'pemateri' => '', 'agenda' => '', 'link_rekaman' => '', 'notulen' => '', 'file_notulen' => '', 'materi_rapat' => ''])
         <section class="meeting-create-section admin-meeting-create">
             <div class="dashboard-section-heading"><h2>{{ $meeting->id ? 'Ubah rapat' : 'Tambah rapat' }}</h2></div>
             <div class="meeting-create-panel">
@@ -645,9 +645,6 @@
                             <p class="mu">Tambahkan agenda dan materi pendukung. Notulen diisi melalui halaman detail saat rapat berlangsung atau setelah rapat selesai.</p>
                             <div class="meeting-form-grid">
                                 <div class="meeting-form-field meeting-form-field-wide"><label>Agenda</label><textarea name="agenda" rows="4">{{ old('agenda', $meeting->agenda) }}</textarea></div>
-                                @if($isSuperAdmin)
-                                    <div class="meeting-form-field"><label for="minutes-deadline-days">Batas pengisian notulen (hari)</label><input id="minutes-deadline-days" type="number" name="batas_notulen_hari" min="1" max="365" value="{{ old('batas_notulen_hari', $meeting->batas_notulen_hari) }}" required><small class="mu">Dihitung sejak rapat selesai. Setelah batas ini, hanya Super Admin dan Pengelola Rapat yang dapat mengedit.</small></div>
-                                @endif
                                 @if($canManageMaterials)
                                     <div class="meeting-form-field meeting-form-field-wide"><label>Unggah materi <span>(maks. 20 MB)</span></label><input type="file" name="materi_rapat" accept=".pdf,.ppt,.pptx,.doc,.docx,.zip"></div>
                                     @if($meeting->materi_rapat)<label class="meeting-form-field-wide meeting-remove-file"><input type="checkbox" name="hapus_materi_rapat" value="1" style="width:auto"> Hapus materi lama saat menyimpan</label>@endif
@@ -672,7 +669,9 @@
                 @if(!$isSuperAdmin)
                     <p class="mu">Pembuatan dan pengelolaan kode presensi hanya dapat dilakukan oleh Super Admin.</p>
                 @else
-                @if(\App\Support\MeetingData::scheduleStatus($attendanceMeeting) === 'selesai')
+                @if(\App\Support\MeetingData::scheduleStatus($attendanceMeeting) === 'dibatalkan')
+                    <p class="tag dibatalkan">Rapat dibatalkan. Kode presensi tidak dapat dibuka atau diubah.</p>
+                @elseif(\App\Support\MeetingData::scheduleStatus($attendanceMeeting) === 'selesai')
                     <p class="mu">Rapat sudah selesai. Presensi hanya dapat ditinjau.</p>
                 @else
                     <h3>Absen masuk</h3>
@@ -724,6 +723,7 @@
         @php($upcomingMeetingCount = $meetingStatuses->filter(fn ($status) => $status === 'akan')->count())
         @php($ongoingMeetingCount = $meetingStatuses->filter(fn ($status) => $status === 'berlangsung')->count())
         @php($completedMeetingCount = $meetingStatuses->filter(fn ($status) => $status === 'selesai')->count())
+        @php($cancelledMeetingCount = $meetingStatuses->filter(fn ($status) => $status === 'dibatalkan')->count())
         @php($completedMeetingIndex = 0)
         <header class="admin-meeting-heading">
             <div>
@@ -753,6 +753,7 @@
                 <button type="button" data-admin-meeting-filter="akan" aria-pressed="false">Akan datang <span>{{ $upcomingMeetingCount }}</span></button>
                 <button type="button" data-admin-meeting-filter="berlangsung" aria-pressed="false">Berlangsung <span>{{ $ongoingMeetingCount }}</span></button>
                 <button type="button" data-admin-meeting-filter="selesai" aria-pressed="false">Selesai <span>{{ $completedMeetingCount }}</span></button>
+                <button type="button" data-admin-meeting-filter="dibatalkan" aria-pressed="false">Dibatalkan <span>{{ $cancelledMeetingCount }}</span></button>
             </div>
             @if($completedMeetingCount > 4)
                 <button class="btn admin-meeting-toggle" type="button" data-admin-completed-toggle aria-expanded="false">
@@ -795,16 +796,21 @@
                                 <span><b aria-hidden="true">⌖</b>{{ $meeting->tempat ?: 'Tempat belum ditentukan' }}</span>
                             </div>
                             <div class="admin-meeting-card-actions">
-                                @if($canViewAttendance)
-                                    <a class="btn sm admin-meeting-attendance" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">{{ $isSuperAdmin ? (\App\Support\MeetingData::attendanceOpen($meeting) ? 'Kode '.$meeting->kode_presensi : 'Atur presensi') : 'Lihat presensi' }}</a>
-                                    <a class="btn sm" href="{{ route('meetings.report.canonical', $meeting->meeting_slug) }}">Unduh PDF Notulen + Daftar Hadir</a>
+                                @if($canEndMeetings && \App\Support\MeetingData::canManuallyStart($meeting))
+                                    <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Mulai rapat ini sekarang?')">@csrf<input type="hidden" name="aksi" value="mulai_rapat"><input type="hidden" name="id" value="{{ $meeting->id }}"><button class="btn sm pri">Mulai Rapat</button></form>
                                 @endif
+                                @if($canViewAttendance)
+                                    <a class="btn sm admin-meeting-attendance" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">{{ $scheduleStatus === 'dibatalkan' ? 'Rincian presensi' : ($isSuperAdmin ? (\App\Support\MeetingData::attendanceOpen($meeting) ? 'Kode '.$meeting->kode_presensi : 'Atur presensi') : 'Lihat presensi') }}</a>
+                                    @if($scheduleStatus !== 'dibatalkan')<a class="btn sm" href="{{ route('meetings.report.canonical', $meeting->meeting_slug) }}">Unduh PDF Notulen + Daftar Hadir</a>@endif
+                                @endif
+                                @if($scheduleStatus === 'berlangsung' && \App\Support\MeetingData::overtimeMinutes($meeting) > 0)<span class="tag overtime">Lewat jadwal {{ \App\Support\MeetingData::overtimeMinutes($meeting) }} menit</span>@endif
+                                @if($scheduleStatus === 'selesai' && (int) ($meeting->overtime_minutes ?? 0) > 0)<span class="tag overtime">Overtime {{ $meeting->overtime_minutes }} menit</span>@endif
                                 @if($canCreateMeetings)
                                     <a class="btn sm" href="{{ route('admin', ['tab' => 'rapat', 'edit' => $meeting->id]) }}">Ubah</a>
                                     <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Hapus rapat ini?')">@csrf<input type="hidden" name="aksi" value="hapus_rapat"><input type="hidden" name="id" value="{{ $meeting->id }}"><button class="btn sm red">Hapus</button></form>
                                 @endif
                                 @if($canEndMeetings && \App\Support\MeetingData::canManuallyEnd($meeting))
-                                    <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Tandai rapat ini sebagai selesai sekarang? Tindakan ini tidak dapat dibatalkan.')">@csrf<input type="hidden" name="aksi" value="selesaikan_rapat"><input type="hidden" name="id" value="{{ $meeting->id }}"><button class="btn sm admin-meeting-end">✓ Selesaikan</button></form>
+                                    <form method="post" action="{{ route('admin.action') }}" onsubmit="return confirm('Tandai rapat ini sebagai selesai sekarang? Tindakan ini tidak dapat dibatalkan.')">@csrf<input type="hidden" name="aksi" value="selesaikan_rapat"><input type="hidden" name="id" value="{{ $meeting->id }}"><button class="btn sm admin-meeting-end">✓ Akhiri Rapat</button></form>
                                 @endif
                             </div>
                         </div>
@@ -939,8 +945,8 @@
         <label><input type="checkbox" name="wajib_izin" value="1" style="width:auto" @checked(\App\Support\MeetingData::setting('wajib_izin', '1') === '1')> Wajib surat izin bila tidak hadir</label>
         <hr class="my-4">
         <b>Batas pengisian dan pengubahan notulen</b>
-        <p class="mu">Batas awal untuk rapat baru. Super Admin dapat mengatur batas berbeda pada setiap rapat. Notulis yang ditetapkan dapat mengisi atau mengubah notulen sampai tenggat; setelah itu hanya Super Admin dan Pengelola Rapat.</p>
-        <label for="minutes-default-days">Batas default (hari setelah rapat selesai)</label>
+        <p class="mu">Batas ini berlaku untuk seluruh rapat dan dihitung sejak rapat selesai. Pengelola Rapat dan notulis yang ditetapkan dapat mengedit notulen sampai tenggat; setelah itu hanya Super Admin yang dapat mengedit. Hanya Super Admin yang dapat mengubah pengaturan ini.</p>
+        <label for="minutes-default-days">Batas pengisian dan pengubahan (hari setelah rapat selesai)</label>
         <input id="minutes-default-days" type="number" name="batas_notulen_default_hari" min="1" max="365" value="{{ old('batas_notulen_default_hari', \App\Support\MeetingData::setting('batas_notulen_default_hari', '7')) }}" required>
         <button class="btn pri mt-3">Simpan</button>
     </form>

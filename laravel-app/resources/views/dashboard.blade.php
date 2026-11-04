@@ -17,12 +17,13 @@
     'akan' => ['Rapat akan datang', 'Tidak ada rapat yang akan datang.'],
     'berlangsung' => ['Rapat sedang berlangsung', 'Tidak ada rapat yang sedang berlangsung.'],
     'selesai' => ['Rapat selesai', 'Belum ada rapat yang selesai.'],
+    'dibatalkan' => ['Rapat dibatalkan', 'Belum ada rapat yang dibatalkan.'],
 ] as $key => [$heading, $empty])
-    @if($canSeeMeetings || $key !== 'selesai')
+    @if($canSeeMeetings || !in_array($key, ['selesai', 'dibatalkan'], true))
         <section class="dashboard-section mt-5">
             <div class="dashboard-section-heading">
                 <h2>{{ $heading }}</h2>
-                <span class="tag {{ $key === 'berlangsung' ? 'hadir' : ($key === 'akan' ? 'akan' : 'selesai') }}">{{ $meetingsByStatus[$key]->count() }}</span>
+                <span class="tag {{ $key === 'berlangsung' ? 'hadir' : ($key === 'akan' ? 'akan' : ($key === 'dibatalkan' ? 'dibatalkan' : 'selesai')) }}">{{ $meetingsByStatus[$key]->count() }}</span>
             </div>
             @if($key === 'selesai' && $meetingsByStatus[$key]->isNotEmpty())
                 <input id="completed-meeting-search" type="search" class="dashboard-search mb-3" aria-label="Cari rapat selesai" placeholder="Cari rapat selesai..." data-completed-search>
@@ -31,7 +32,7 @@
             @if($key === 'akan')
                 <div class="upcoming-slider" data-upcoming-slider aria-label="Rapat yang akan datang">
                     <div class="upcoming-slider-track" data-slider-track aria-live="off">
-            @elseif($key === 'selesai')
+            @elseif(in_array($key, ['selesai', 'dibatalkan'], true))
                 <div class="completed-meetings-grid">
             @endif
             @forelse($meetingsByStatus[$key] as $meeting)
@@ -49,16 +50,25 @@
                             <p class="mu">{{ \App\Support\MeetingData::date($meeting->tanggal) }} · {{ $meeting->tempat ?: 'Tempat belum ditentukan' }} · {{ $meeting->moda }} · 👥 {{ $meeting->jumlah_hadir }} pegawai hadir · {{ $meeting->jumlah_tamu }} tamu</p>
                         </div>
                     </a>
-                    @if(\App\Support\MeetingData::attendanceOpen($meeting) && (!$employee || !$meeting->status_kehadiran))<span class="tag hadir">🟢 Presensi buka</span>@endif
-                    @if($employee && $meeting->status_kehadiran === 'hadir' && !$meeting->waktu_pulang && \App\Support\MeetingData::checkoutOpen($meeting))<span class="tag hadir">🟢 Presensi pulang buka</span>@endif
+                    @if($scheduleStatus === 'berlangsung' && \App\Support\MeetingData::attendanceOpen($meeting) && (!$employee || !$meeting->status_kehadiran))<span class="tag hadir">🟢 Presensi buka</span>@endif
+                    @if(in_array($scheduleStatus, ['berlangsung', 'selesai'], true) && $employee && $meeting->status_kehadiran === 'hadir' && !$meeting->waktu_pulang && \App\Support\MeetingData::checkoutOpen($meeting))<span class="tag hadir">🟢 Presensi pulang buka</span>@endif
                     @if($employee)<span class="tag {{ $meeting->status_kehadiran ?: 'kosong' }}">{{ $meeting->status_kehadiran === 'hadir' ? 'Hadir' : ($meeting->status_kehadiran === 'izin' ? 'Izin '.$meeting->status_izin : 'Belum presensi') }}</span>@endif
+                    @if($scheduleStatus === 'dibatalkan')<span class="tag dibatalkan">Dibatalkan</span>@endif
+                    @if($scheduleStatus === 'berlangsung' && \App\Support\MeetingData::overtimeMinutes($meeting) > 0)<span class="tag overtime">Lewat jadwal {{ \App\Support\MeetingData::overtimeMinutes($meeting) }} menit</span>@endif
+                    @if($scheduleStatus === 'selesai' && (int) ($meeting->overtime_minutes ?? 0) > 0)<span class="tag overtime">Overtime {{ $meeting->overtime_minutes }} menit</span>@endif
                     @if(!$employee && $scheduleStatus === 'berlangsung' && $previewRoom)
                         <a class="btn sm" href="{{ route('live-board', ['room_id' => $previewRoom->id]) }}">Preview Live Board</a>
+                    @endif
+                    @if($canEndMeetings && \App\Support\MeetingData::canManuallyStart($meeting))
+                        <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Mulai rapat ini sekarang?')">
+                            @csrf<input type="hidden" name="aksi" value="mulai_rapat">
+                            <button class="btn sm pri">Mulai Rapat</button>
+                        </form>
                     @endif
                     @if($canEndMeetings && \App\Support\MeetingData::canManuallyEnd($meeting))
                         <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">
                             @csrf<input type="hidden" name="aksi" value="selesaikan_rapat">
-                            <button class="btn sm red">Selesaikan Rapat</button>
+                            <button class="btn sm red">Akhiri Rapat</button>
                         </form>
                     @endif
                 </div>
@@ -79,7 +89,7 @@
                         </div>
                     @endif
                 </div>
-            @elseif($key === 'selesai')
+            @elseif(in_array($key, ['selesai', 'dibatalkan'], true))
                 </div>
             @endif
             @if($key === 'selesai' && $meetingsByStatus[$key]->count() > 3)

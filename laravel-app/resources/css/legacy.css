@@ -676,6 +676,12 @@ label {
     font-variant-numeric: tabular-nums
 }
 
+.live-board-overtime {
+    margin: 0;
+    color: #b45309;
+    font-weight: 800;
+}
+
 .live-board-count {
     display: flex;
     align-items: baseline;

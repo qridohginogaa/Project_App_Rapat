@@ -15,14 +15,18 @@ final class MeetingData
 
     public static function scheduleStatus(array|object $meeting): string
     {
+        if (data_get($meeting, 'cancelled_at')) {
+            return 'dibatalkan';
+        }
         if (data_get($meeting, 'ended_at')) {
             return 'selesai';
         }
-        $timezone = config('app.timezone');
-        $starts = \Illuminate\Support\Carbon::parse(data_get($meeting, 'tanggal').' '.data_get($meeting, 'mulai'), $timezone);
-        $ends = \Illuminate\Support\Carbon::parse(data_get($meeting, 'tanggal').' '.data_get($meeting, 'selesai'), $timezone);
+        $meetingDate = (string) data_get($meeting, 'tanggal');
+        if ($meetingDate < now()->toDateString()) {
+            return data_get($meeting, 'started_at') ? 'selesai' : 'dibatalkan';
+        }
 
-        return now()->lt($starts) ? 'akan' : (now()->lt($ends) ? 'berlangsung' : 'selesai');
+        return data_get($meeting, 'started_at') ? 'berlangsung' : 'akan';
     }
 
     public static function slug(array|object $meeting): string
@@ -121,15 +125,15 @@ final class MeetingData
 
     public static function minutesDeadline(array|object $meeting): \Illuminate\Support\Carbon
     {
-        $endedAt = data_get($meeting, 'ended_at');
+        $endedAt = self::effectiveEndedAt($meeting);
         $meetingEnd = $endedAt
-            ? \Illuminate\Support\Carbon::parse($endedAt, config('app.timezone'))
+            ? $endedAt->copy()
             : \Illuminate\Support\Carbon::parse(
                 data_get($meeting, 'tanggal').' '.data_get($meeting, 'selesai'),
                 config('app.timezone')
             );
 
-        return $meetingEnd->addDays((int) (data_get($meeting, 'batas_notulen_hari') ?? 7));
+        return $meetingEnd->addDays((int) self::setting('batas_notulen_default_hari', '7'));
     }
 
     public static function minutesEditingOpen(array|object $meeting): bool
@@ -147,16 +151,47 @@ final class MeetingData
 
     public static function canManuallyEnd(array|object $meeting): bool
     {
-        if (data_get($meeting, 'ended_at')) {
-            return false;
+        return (bool) data_get($meeting, 'started_at')
+            && !data_get($meeting, 'ended_at')
+            && !data_get($meeting, 'cancelled_at')
+            && (string) data_get($meeting, 'tanggal') >= now()->toDateString();
+    }
+
+    public static function canManuallyStart(array|object $meeting): bool
+    {
+        return !data_get($meeting, 'started_at')
+            && !data_get($meeting, 'ended_at')
+            && !data_get($meeting, 'cancelled_at')
+            && (string) data_get($meeting, 'tanggal') >= now()->toDateString();
+    }
+
+    public static function effectiveEndedAt(array|object $meeting): ?\Illuminate\Support\Carbon
+    {
+        $endedAt = data_get($meeting, 'ended_at');
+        if ($endedAt) {
+            return \Illuminate\Support\Carbon::parse($endedAt, config('app.timezone'));
         }
 
-        $starts = \Illuminate\Support\Carbon::parse(
-            data_get($meeting, 'tanggal').' '.data_get($meeting, 'mulai'),
+        if (data_get($meeting, 'started_at') && (string) data_get($meeting, 'tanggal') < now()->toDateString()) {
+            return \Illuminate\Support\Carbon::parse(data_get($meeting, 'tanggal'), config('app.timezone'))
+                ->addDay()
+                ->startOfDay();
+        }
+
+        return null;
+    }
+
+    public static function overtimeMinutes(array|object $meeting): int
+    {
+        $scheduledEnd = \Illuminate\Support\Carbon::parse(
+            data_get($meeting, 'tanggal').' '.data_get($meeting, 'selesai'),
             config('app.timezone')
         );
+        $actualEnd = self::effectiveEndedAt($meeting) ?? now();
 
-        return $starts->isToday() && now()->greaterThanOrEqualTo($starts);
+        return $actualEnd->greaterThan($scheduledEnd)
+            ? (int) $scheduledEnd->diffInMinutes($actualEnd)
+            : 0;
     }
 
     public static function code(int $length = 6): string

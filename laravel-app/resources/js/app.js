@@ -232,6 +232,17 @@ if (liveBoard) {
                 ? `${hours} jam ${minutes} menit ${remainingSeconds} detik`
                 : `${minutes} menit ${remainingSeconds} detik`;
             duration.textContent = `Berlangsung ${elapsed}`;
+
+            const overtime = duration.parentElement.querySelector('[data-meeting-overtime]');
+            const scheduledEnd = Date.parse(duration.dataset.scheduledEnd);
+            const overtimeSeconds = Math.max(0, Math.floor((now - scheduledEnd) / 1000));
+            const overtimeHours = Math.floor(overtimeSeconds / 3600);
+            const overtimeMinutes = Math.floor((overtimeSeconds % 3600) / 60);
+            const overtimeRemainingSeconds = overtimeSeconds % 60;
+            overtime.hidden = overtimeSeconds === 0;
+            overtime.textContent = overtimeHours > 0
+                ? `Overtime ${overtimeHours} jam ${overtimeMinutes} menit ${overtimeRemainingSeconds} detik`
+                : `Overtime ${overtimeMinutes} menit ${overtimeRemainingSeconds} detik`;
         });
     };
 
@@ -262,11 +273,15 @@ if (liveBoard) {
             const details = element('p', 'live-board-meta', `${meeting.place} · ${meeting.mode}`);
             const duration = element('p', 'live-board-duration');
             duration.dataset.meetingStart = meeting.started_at;
+            duration.dataset.scheduledEnd = meeting.scheduled_end_at;
+            const overtime = element('p', 'live-board-overtime');
+            overtime.dataset.meetingOvertime = '';
+            overtime.hidden = true;
             const count = element('div', 'live-board-count');
             count.appendChild(element('strong', '', String(meeting.attendee_count)));
             count.appendChild(element('span', '', 'Hadir'));
 
-            card.append(title, schedule, details, duration, count);
+            card.append(title, schedule, details, duration, overtime, count);
             fragment.appendChild(card);
         });
 

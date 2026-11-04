@@ -9,6 +9,11 @@
             <div class="meeting-detail-title-row">
                 <h2>{{ $meeting->judul }}</h2>
                 <span class="meeting-detail-status meeting-detail-status-{{ $scheduleStatus }}"><span></span>{{ $scheduleStatus === 'akan' ? 'Akan datang' : ucfirst($scheduleStatus) }}</span>
+                @if($scheduleStatus === 'berlangsung' && \App\Support\MeetingData::overtimeMinutes($meeting) > 0)
+                    <span class="tag overtime">Lewat jadwal {{ \App\Support\MeetingData::overtimeMinutes($meeting) }} menit</span>
+                @elseif($scheduleStatus === 'selesai' && (int) ($meeting->overtime_minutes ?? 0) > 0)
+                    <span class="tag overtime">Overtime {{ $meeting->overtime_minutes }} menit</span>
+                @endif
             </div>
             <div class="meeting-detail-meta">
                 <span><b aria-hidden="true">▣</b>{{ \App\Support\MeetingData::date($meeting->tanggal) }}</span>
@@ -20,12 +25,17 @@
         @if($showMeetingAdminTools || $canExportMeetingReport || $meeting->link_meeting)
             <div class="meeting-detail-hero-actions">
                 @if($meeting->link_meeting)<a class="btn pri sm" href="{{ $meeting->link_meeting }}" target="_blank" rel="noopener">Buka tautan meeting <span aria-hidden="true">↗</span></a>@endif
-                @if($canExportMeetingReport)<a class="btn sm" href="{{ route('meetings.report.canonical', \App\Support\MeetingData::slug($meeting)) }}">Unduh PDF Notulen + Daftar Hadir</a>@endif
+                @if($canExportMeetingReport)
+                    <div class="meeting-detail-report-actions">
+                        <a class="btn sm" href="{{ route('meetings.report.canonical', \App\Support\MeetingData::slug($meeting)) }}">Unduh PDF Notulen + Daftar Hadir</a>
+                        @if($isSuperAdmin)<a class="btn sm meeting-detail-manage" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">Atur presensi</a>@endif
+                    </div>
+                @endif
                 @if($showMeetingAdminTools)<a class="btn sm meeting-detail-manage" href="{{ route('admin', ['tab' => 'rapat', 'presensi' => $meeting->id]) }}">Kelola presensi</a>@endif
                 @if($showMeetingAdminTools && \App\Support\MeetingData::canManuallyEnd($meeting))
                     <form method="post" action="{{ route('meetings.action', $meeting->id) }}" onsubmit="return confirm('Selesaikan rapat ini sekarang dan buka presensi pulang selama 30 menit?')">
                         @csrf<input type="hidden" name="aksi" value="selesaikan_rapat">
-                        <button class="btn sm red">Selesaikan rapat</button>
+                        <button class="btn sm red">Akhiri Rapat</button>
                     </form>
                 @endif
             </div>
@@ -180,6 +190,9 @@
         @else
         <div class="box">
             <p class="mu">Kode hadir dan kode pulang dibuat terpisah oleh Super Admin. Pegawai memasukkan kode yang sesuai pada satu kolom presensi.</p>
+            @if($scheduleStatus === 'dibatalkan')
+                <p class="tag dibatalkan">Rapat dibatalkan. Kode presensi tidak dapat dibuka atau diubah.</p>
+            @else
             <h3>Absen masuk</h3>
             @if(\App\Support\MeetingData::attendanceOpen($meeting))
                 <p>Kode aktif: <b>{{ $meeting->kode_presensi }}</b> · berlaku sampai {{ substr($meeting->presensi_kedaluwarsa, 11, 5) }} WITA</p>
@@ -212,6 +225,7 @@
                 <label>Batas waktu setelah rapat selesai</label><select name="durasi"><option value="15">15 menit</option><option value="30" selected>30 menit</option><option value="60">1 jam</option></select>
                 <button class="btn pri mt-3">Buat kode absen pulang</button>
             </form>
+            @endif
         </div>
         @endif
     @endif

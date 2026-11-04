@@ -3355,6 +3355,18 @@ table {
     color: #5b6878;
 }
 
+.admin-meeting-status-dibatalkan {
+    border-color: rgb(220 38 38 / 20%);
+    background: rgb(254 242 242 / 90%);
+    color: #b42318;
+}
+
+.tag.dibatalkan {
+    border-color: rgb(220 38 38 / 20%);
+    background: rgb(254 242 242 / 90%);
+    color: #b42318;
+}
+
 .admin-meeting-card-meta {
     display: flex;
     flex-wrap: wrap;
@@ -3709,6 +3721,13 @@ table {
 
 .meeting-detail-hero-actions form {
     margin: 0;
+}
+
+.meeting-detail-report-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
 }
 
 .meeting-detail-hero-actions .btn {
@@ -4487,7 +4506,9 @@ table {
 
     .meeting-detail-hero-actions .btn,
     .meeting-detail-hero-actions form,
-    .meeting-detail-hero-actions form .btn {
+    .meeting-detail-hero-actions form .btn,
+    .meeting-detail-report-actions,
+    .meeting-detail-report-actions .btn {
         width: 100%;
         justify-content: center;
     }
@@ -4709,6 +4730,11 @@ table {
 .signature-verify-banner.is-valid {
     background: #e8faf2;
     color: #086c4b;
+}
+
+.signature-verify-banner.is-pending {
+    background: #fff8e8;
+    color: #8a5a12;
 }
 
 .signature-verify-banner.is-invalid {

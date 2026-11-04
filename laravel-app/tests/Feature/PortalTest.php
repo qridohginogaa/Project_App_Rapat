@@ -309,6 +309,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(30)->format('H:i:s'),
             'selesai' => now()->addMinutes(30)->format('H:i:s'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(30),
             'kode_presensi' => 'TAMU42',
             'presensi_kedaluwarsa' => now()->addMinutes(15),
         ]);
@@ -385,6 +386,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(30)->format('H:i:s'),
             'selesai' => now()->addMinutes(30)->format('H:i:s'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(30),
             'kode_presensi' => 'TAMU42',
             'presensi_kedaluwarsa' => now()->addMinutes(15),
         ]);
@@ -466,12 +468,14 @@ class PortalTest extends TestCase
 
     public function test_student_nim_prevents_duplicate_guest_attendance(): void
     {
+        $startedAt = now()->subMinutes(30)->startOfMinute();
         $meetingId = DB::table('rapat')->insertGetId([
             'judul' => 'Rapat mahasiswa unik',
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subMinutes(30)->format('H:i:s'),
             'selesai' => now()->addMinutes(30)->format('H:i:s'),
             'moda' => 'Luring',
+            'started_at' => $startedAt,
             'kode_presensi' => 'TAMU42',
             'presensi_kedaluwarsa' => now()->addMinutes(15),
         ]);
@@ -506,6 +510,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(30)->format('H:i:s'),
             'selesai' => now()->addMinutes(30)->format('H:i:s'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(30),
             'kode_presensi' => 'MASUK42',
             'presensi_kedaluwarsa' => now()->addMinutes(15),
             'kode_presensi_pulang' => 'PULANG42',
@@ -578,6 +583,7 @@ class PortalTest extends TestCase
                 'mulai' => '09:00',
                 'selesai' => '10:00',
                 'moda' => 'Luring',
+                'ended_at' => now()->subDays($number)->setTime(10, 0),
             ]);
         }
 
@@ -602,6 +608,7 @@ class PortalTest extends TestCase
             'selesai' => now()->addMinutes(40)->format('H:i'),
             'tempat' => 'Bunaken',
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(20),
         ]);
 
         $this->get('/')
@@ -643,6 +650,8 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '10:00',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
         ]);
         DB::table('kehadiran')->insert([
             'rapat_id' => $meetingId,
@@ -716,6 +725,8 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '10:00',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
         ]);
         $approvedEmployeeId = DB::table('pegawai')->insertGetId([
             'nip' => '123456789012345678',
@@ -799,6 +810,8 @@ class PortalTest extends TestCase
                 'mulai' => '09:00',
                 'selesai' => '10:00',
                 'moda' => 'Luring',
+                'started_at' => now()->subDay()->setTime(9, 0),
+                'ended_at' => now()->subDay()->setTime(10, 0),
             ]);
         }
         DB::table('rapat')->insert([
@@ -835,6 +848,8 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '10:00',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
         ]);
 
         $this->withSession([
@@ -856,6 +871,8 @@ class PortalTest extends TestCase
                 'mulai' => '09:00',
                 'selesai' => '10:00',
                 'moda' => 'Luring',
+                'started_at' => now()->subDays($number)->setTime(9, 0),
+                'ended_at' => now()->subDays($number)->setTime(10, 0),
             ]);
         }
 
@@ -878,6 +895,8 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '10:00',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
         ]);
         $employeeId = DB::table('pegawai')->insertGetId([
             'nip' => '123456789012345678',
@@ -966,6 +985,8 @@ class PortalTest extends TestCase
             'selesai' => '10:00',
             'tempat' => 'Ruang Bunaken',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
             'pimpinan_pegawai_id' => $chairId,
             'pimpinan' => 'Pimpinan Tes',
             'notulis_pegawai_id' => $minuteTakerId,
@@ -1026,12 +1047,14 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee($route);
 
-        $this->withSession(['admin_id' => 1])->get($route)
-            ->assertRedirect()
-            ->assertSessionHasErrors('tanda_tangan');
+        $pendingDownload = $this->withSession(['admin_id' => 1])->get($route);
+        $pendingDownload->assertOk()
+            ->assertDownload('rapat-format-contoh-notulen-daftar-hadir.pdf')
+            ->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $pendingDownload->streamedContent());
         $this->withSession(['admin_id' => 1])->get($legacyRoute)
-            ->assertRedirect()
-            ->assertSessionHasErrors('tanda_tangan');
+            ->assertOk()
+            ->assertDownload('rapat-format-contoh-notulen-daftar-hadir.pdf');
 
         $chairSession = [
             'employee_id' => $chairId,
@@ -1043,11 +1066,25 @@ class PortalTest extends TestCase
             'employee_password_hash' => $minuteTakerPasswordHash,
             'active_role' => 'pegawai',
         ];
+        $meetingRecord = DB::table('rapat')->where('id', $meetingId)->first();
+        $meetingDetailUrl = route('meetings.canonical', \App\Support\MeetingData::slug($meetingRecord));
+        $this->get(route('signatures.verify', str_repeat('a', 64)))
+            ->assertOk()
+            ->assertSee('Surat Belum Terverifikasi')
+            ->assertSee('belum terverifikasi karena persetujuan tanda tangan digital')
+            ->assertSee('Pimpinan Tes')
+            ->assertSee('TANGGAL KONFIRMASI TANDA TANGAN')
+            ->assertSee('RAPAT YANG DIKONFIRMASI');
         $this->withSession($chairSession)->get(route('signatures.index'))
             ->assertOk()
             ->assertSee('Rapat Format Contoh')
             ->assertSee('PIMPINAN RAPAT')
+            ->assertSee('href="'.$meetingDetailUrl.'"', false)
             ->assertSee('Terima & setujui');
+        $this->withSession($chairSession)->get($meetingDetailUrl)
+            ->assertOk()
+            ->assertSee('Rapat Format Contoh')
+            ->assertSee('Notulen rapat');
         $this->withSession($chairSession)->post(route('signatures.accept', [$meetingId, 'pimpinan']))
             ->assertRedirect(route('signatures.index'));
         $this->withSession($minuteTakerSession)->post(route('signatures.accept', [$meetingId, 'notulis']))
@@ -2066,6 +2103,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(20)->format('H:i'),
             'selesai' => now()->addMinutes(10)->format('H:i'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(20),
             'kode_presensi' => 'MASUK8',
             'presensi_kedaluwarsa' => now()->addMinutes(20),
         ]);
@@ -2096,7 +2134,7 @@ class PortalTest extends TestCase
 
         $this->withSession($session)->get('/')
             ->assertOk()
-            ->assertSee('Selesaikan Rapat');
+            ->assertSee('Akhiri Rapat');
         $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'selesaikan_rapat',
         ])->assertRedirect('/meetings/'.$meetingId);
@@ -2146,6 +2184,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(20)->format('H:i'),
             'selesai' => now()->subMinutes(10)->format('H:i'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(20),
         ]);
 
         $this->withSession([
@@ -2162,14 +2201,14 @@ class PortalTest extends TestCase
             'active_role' => 'admin',
         ])->get('/')
             ->assertOk()
-            ->assertSee('Selesaikan Rapat');
+            ->assertSee('Akhiri Rapat');
         $this->withSession([
             'employee_id' => $employeeId,
             'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
             'active_role' => 'admin',
         ])->get('/admin/rapat')
             ->assertOk()
-            ->assertSee('✓ Selesaikan');
+            ->assertSee('✓ Akhiri Rapat');
 
         $this->withSession([
             'employee_id' => $employeeId,
@@ -2185,6 +2224,166 @@ class PortalTest extends TestCase
             ->equalTo(\Illuminate\Support\Carbon::parse($meeting->ended_at)->addMinutes(30)));
     }
 
+    public function test_super_admin_can_start_a_meeting_manually_from_the_dashboard(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Dimulai Manual',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $session = $this->superAdminSession();
+
+        $this->withSession($session)->get('/')
+            ->assertOk()
+            ->assertSee('Mulai Rapat');
+        $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'mulai_rapat',
+        ])->assertRedirect();
+
+        $meeting = DB::table('rapat')->where('id', $meetingId)->first();
+        $this->assertNotNull($meeting->started_at);
+        $this->assertSame('berlangsung', \App\Support\MeetingData::scheduleStatus($meeting));
+
+        $this->withSession($session)->get('/')
+            ->assertOk()
+            ->assertSee('Akhiri Rapat')
+            ->assertDontSee('Mulai Rapat');
+    }
+
+    public function test_meeting_manager_can_start_a_meeting_and_regular_employee_cannot_change_lifecycle(): void
+    {
+        $managerId = DB::table('pegawai')->insertGetId([
+            'nip' => '222222222222222222',
+            'nama' => 'Pengelola Tes',
+            'jabatan' => 'Pengelola',
+            'password_hash' => Hash::make('password-manager'),
+        ]);
+        DB::table('admin_pegawai')->insert(['pegawai_id' => $managerId]);
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '333333333333333333',
+            'nama' => 'Pegawai Tes',
+            'jabatan' => 'Pegawai',
+            'password_hash' => Hash::make('password-employee'),
+        ]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Mulai Pengelola',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $managerSession = [
+            'employee_id' => $managerId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $managerId)->value('password_hash'),
+            'active_role' => 'admin',
+        ];
+        $employeeSession = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
+            'active_role' => 'pegawai',
+        ];
+
+        $this->withSession($managerSession)->get('/')
+            ->assertOk()
+            ->assertSee('Mulai Rapat');
+        $this->withSession($managerSession)->post('/admin/actions', [
+            'aksi' => 'mulai_rapat',
+            'id' => $meetingId,
+        ])->assertRedirect('/admin/rapat');
+        $this->assertNotNull(DB::table('rapat')->where('id', $meetingId)->value('started_at'));
+
+        $this->withSession($employeeSession)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'selesaikan_rapat',
+        ])->assertForbidden();
+        $unstartedMeetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Belum Dimulai',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '11:00',
+            'selesai' => '12:00',
+            'moda' => 'Luring',
+        ]);
+        $this->withSession($employeeSession)->post('/meetings/'.$unstartedMeetingId.'/actions', [
+            'aksi' => 'mulai_rapat',
+        ])->assertForbidden();
+    }
+
+    public function test_expired_meetings_are_cancelled_or_ended_at_midnight(): void
+    {
+        $timezone = config('app.timezone');
+        $meetingDate = \Illuminate\Support\Carbon::parse('2026-11-04 00:00:00', $timezone);
+        $deadline = $meetingDate->copy()->addDay()->startOfDay();
+        $this->travelTo($deadline->copy()->addMinute());
+
+        $startedMeetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Otomatis Selesai',
+            'tanggal' => $meetingDate->toDateString(),
+            'mulai' => '20:00',
+            'selesai' => '22:00',
+            'moda' => 'Luring',
+            'started_at' => $meetingDate->copy()->setTime(20, 0),
+        ]);
+        $startedWithCheckoutId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Kode Pulang Aktif',
+            'tanggal' => $meetingDate->toDateString(),
+            'mulai' => '20:00',
+            'selesai' => '23:30',
+            'moda' => 'Luring',
+            'started_at' => $meetingDate->copy()->setTime(20, 0),
+            'kode_presensi_pulang' => 'PULANG8',
+            'presensi_pulang_kedaluwarsa' => $deadline->copy()->addMinutes(15),
+        ]);
+        $unstartedMeetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Otomatis Dibatalkan',
+            'tanggal' => $meetingDate->toDateString(),
+            'mulai' => '23:00',
+            'selesai' => '23:30',
+            'moda' => 'Luring',
+            'kode_presensi_pulang' => 'PULANG9',
+            'presensi_pulang_kedaluwarsa' => $deadline->copy()->addMinutes(10),
+        ]);
+
+        \Illuminate\Support\Facades\Artisan::call('meetings:finalize-expired');
+
+        $finished = DB::table('rapat')->where('id', $startedMeetingId)->first();
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($finished->ended_at, $timezone)->equalTo($deadline));
+        $this->assertSame(120, (int) $finished->overtime_minutes);
+        $this->assertNotEmpty($finished->kode_presensi_pulang);
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($finished->presensi_pulang_kedaluwarsa, $timezone)
+            ->equalTo($deadline->copy()->addMinutes(30)));
+        $this->assertSame('selesai', \App\Support\MeetingData::scheduleStatus($finished));
+
+        $finishedWithCheckout = DB::table('rapat')->where('id', $startedWithCheckoutId)->first();
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($finishedWithCheckout->ended_at, $timezone)->equalTo($deadline));
+        $this->assertSame('PULANG8', $finishedWithCheckout->kode_presensi_pulang);
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($finishedWithCheckout->presensi_pulang_kedaluwarsa, $timezone)
+            ->equalTo($deadline->copy()->addMinutes(15)));
+
+        $cancelled = DB::table('rapat')->where('id', $unstartedMeetingId)->first();
+        $this->assertNull($cancelled->started_at);
+        $this->assertNull($cancelled->ended_at);
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($cancelled->cancelled_at, $timezone)->equalTo($deadline));
+        $this->assertSame('dibatalkan', \App\Support\MeetingData::scheduleStatus($cancelled));
+        $this->assertFalse(\App\Support\MeetingData::canManuallyStart($cancelled));
+        $this->withSession($this->superAdminSession())->post('/meetings/'.$unstartedMeetingId.'/actions', [
+            'aksi' => 'mulai_rapat',
+        ])->assertStatus(409);
+        $this->withSession($this->superAdminSession())->get('/')
+            ->assertOk()
+            ->assertSee('Rapat dibatalkan')
+            ->assertSee('Rapat Otomatis Dibatalkan');
+        $this->get(route('guest-attendance'))
+            ->assertOk()
+            ->assertDontSee('Rapat Otomatis Dibatalkan');
+        $this->withSession($this->superAdminSession())->post('/admin/actions', [
+            'aksi' => 'atur_presensi',
+            'id' => $unstartedMeetingId,
+            'opsi_presensi' => 'buat',
+        ])->assertRedirect('/admin/rapat?presensi='.$unstartedMeetingId)
+            ->assertSessionHasErrors('presensi');
+    }
+
     public function test_ending_meeting_preserves_an_active_checkout_code_created_earlier(): void
     {
         $meetingId = DB::table('rapat')->insertGetId([
@@ -2193,6 +2392,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(20)->format('H:i'),
             'selesai' => now()->addMinutes(20)->format('H:i'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(20),
             'kode_presensi_pulang' => 'PULANG8',
             'presensi_pulang_kedaluwarsa' => now()->addMinutes(35),
         ]);
@@ -2209,14 +2409,16 @@ class PortalTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_finish_a_meeting_after_its_scheduled_end_time(): void
+    public function test_admin_can_finish_a_meeting_manually_and_record_overtime(): void
     {
+        $this->travelTo(now()->setTime(12, 10));
         $meetingId = DB::table('rapat')->insertGetId([
             'judul' => 'Rapat Lewat Jadwal Selesai',
             'tanggal' => now()->toDateString(),
-            'mulai' => now()->subMinutes(20)->format('H:i'),
-            'selesai' => now()->subMinutes(5)->format('H:i'),
+            'mulai' => '10:00',
+            'selesai' => '12:00',
             'moda' => 'Luring',
+            'started_at' => now()->setTime(10, 0),
         ]);
 
         $this->withSession(['admin_id' => 1])->post('/admin/actions', [
@@ -2227,6 +2429,7 @@ class PortalTest extends TestCase
         $meeting = DB::table('rapat')->where('id', $meetingId)->first();
         $this->assertNotNull($meeting->ended_at);
         $this->assertNotEmpty($meeting->kode_presensi_pulang);
+        $this->assertSame(10, (int) $meeting->overtime_minutes);
     }
 
     public function test_meeting_from_a_past_date_cannot_be_manually_ended(): void
@@ -2281,12 +2484,14 @@ class PortalTest extends TestCase
 
     public function test_public_live_board_reports_attendance_count_without_personal_data(): void
     {
+        $startedAt = now()->subMinutes(30)->startOfMinute();
         $meetingId = DB::table('rapat')->insertGetId([
             'judul' => 'Rapat Sedang Berlangsung',
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subMinutes(30)->format('H:i'),
             'selesai' => now()->addMinutes(30)->format('H:i'),
             'moda' => 'Luring',
+            'started_at' => $startedAt,
         ]);
         $presentId = DB::table('pegawai')->insertGetId([
             'nip' => '123456789012345678',
@@ -2319,7 +2524,7 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertJsonPath('meetings.0.title', 'Rapat Sedang Berlangsung')
             ->assertJsonPath('meetings.0.attendee_count', 1)
-            ->assertJsonPath('meetings.0.started_at', now()->subMinutes(30)->startOfMinute()->toIso8601String())
+            ->assertJsonPath('meetings.0.started_at', $startedAt->toIso8601String())
             ->assertJsonMissingPath('meetings.0.attendees')
             ->assertJsonMissingPath('meetings.0.name')
             ->assertJsonMissing(['name' => 'Pegawai Izin']);
@@ -2349,6 +2554,7 @@ class PortalTest extends TestCase
                 'tanggal' => now()->toDateString(),
                 'mulai' => now()->subMinutes(20)->format('H:i'),
                 'selesai' => now()->addMinutes(40)->format('H:i'),
+                'started_at' => now()->subMinutes(20),
                 'room_id' => $meeting['room_id'],
                 'tempat' => $meeting['room_id'] === $bunakenId ? 'Bunaken Room' : 'Dihaga Room',
                 'moda' => 'Luring',
@@ -2385,7 +2591,7 @@ class PortalTest extends TestCase
         $this->get('/meetings/'.$meetingId)->assertForbidden();
     }
 
-    public function test_meeting_detail_shows_completed_status_after_the_scheduled_end_time(): void
+    public function test_meeting_remains_active_after_scheduled_end_until_manually_finished(): void
     {
         $employeeId = DB::table('pegawai')->insertGetId([
         'nip' => '123456789012345678',
@@ -2399,6 +2605,7 @@ class PortalTest extends TestCase
         'mulai' => now()->subMinutes(20)->format('H:i'),
         'selesai' => now()->subMinutes(5)->format('H:i'),
         'moda' => 'Luring',
+        'started_at' => now()->subMinutes(20),
         ]);
 
         $this->withSession([
@@ -2406,8 +2613,8 @@ class PortalTest extends TestCase
         'employee_password_hash' => DB::table('pegawai')->where('id', $employeeId)->value('password_hash'),
         ])->get('/meetings/'.$meetingId)
         ->assertOk()
-        ->assertSee('meeting-detail-status-selesai')
-        ->assertSee('>Selesai</span>', false);
+        ->assertSee('meeting-detail-status-berlangsung')
+        ->assertSee('Lewat jadwal 5 menit');
     }
 
     public function test_employee_can_view_saved_minutes_during_an_ongoing_meeting_without_being_the_recorder(): void
@@ -2425,6 +2632,7 @@ class PortalTest extends TestCase
             'tanggal' => now()->toDateString(),
             'mulai' => now()->subMinutes(20)->format('H:i'),
             'selesai' => now()->addMinutes(40)->format('H:i'),
+            'started_at' => now()->subMinutes(20),
             'moda' => 'Luring',
             'notulis' => '',
             'notulen' => 'Ringkasan notulen yang sudah disimpan.',
@@ -2643,7 +2851,7 @@ class PortalTest extends TestCase
         $this->withSession(['admin_id' => 1])->get('/admin/rapat?edit=0')
             ->assertOk()
             ->assertSee('Notulen diisi melalui halaman detail saat rapat berlangsung atau setelah rapat selesai.')
-            ->assertSee('name="batas_notulen_hari"', false)
+            ->assertDontSee('name="batas_notulen_hari"', false)
             ->assertSee('Pilih akun pegawai')
             ->assertSee('meeting-chair-picker-search')
             ->assertSee('meeting-minute-taker-picker-search')
@@ -2660,12 +2868,10 @@ class PortalTest extends TestCase
             'selesai' => '10:00',
             'moda' => 'Luring',
             'semua_pegawai' => '1',
-            'batas_notulen_hari' => '3',
         ])->assertRedirect('/admin/rapat');
 
         $meetingId = DB::table('rapat')->where('judul', 'Rapat Semua Pegawai')->value('id');
         $this->assertNotNull($meetingId);
-        $this->assertSame(3, (int) DB::table('rapat')->where('id', $meetingId)->value('batas_notulen_hari'));
         $this->assertSame(0, DB::table('meeting_participants')->where('rapat_id', $meetingId)->count());
 
         $this->withSession(['admin_id' => 1])->get('/admin/rapat?edit='.$meetingId)
@@ -2733,7 +2939,7 @@ class PortalTest extends TestCase
             ->assertSee('Akses penuh');
     }
 
-    public function test_super_admin_can_set_default_and_per_meeting_minutes_deadline(): void
+    public function test_super_admin_sets_global_minutes_deadline_in_settings_only(): void
     {
         $session = $this->superAdminSession();
         $this->withSession($session)->get('/admin/pengaturan')
@@ -2758,11 +2964,14 @@ class PortalTest extends TestCase
             'selesai' => '10:00',
             'moda' => 'Luring',
             'semua_pegawai' => '1',
-            'batas_notulen_hari' => '4',
         ])->assertRedirect('/admin/rapat');
 
         $meetingId = DB::table('rapat')->where('judul', 'Rapat Batas Notulen')->value('id');
-        $this->assertSame(4, (int) DB::table('rapat')->where('id', $meetingId)->value('batas_notulen_hari'));
+        $meeting = DB::table('rapat')->where('id', $meetingId)->first();
+        $this->assertSame(
+            \Illuminate\Support\Carbon::parse($meeting->tanggal.' '.$meeting->selesai)->addDays(14)->toDateTimeString(),
+            \App\Support\MeetingData::minutesDeadline($meeting)->toDateTimeString()
+        );
 
         $this->withSession($session)->post('/admin/actions', [
             'aksi' => 'simpan_rapat',
@@ -2774,12 +2983,34 @@ class PortalTest extends TestCase
             'semua_pegawai' => '1',
         ])->assertRedirect('/admin/rapat');
         $defaultMeetingId = DB::table('rapat')->where('judul', 'Rapat Batas Default')->value('id');
-        $this->assertSame(14, (int) DB::table('rapat')->where('id', $defaultMeetingId)->value('batas_notulen_hari'));
+        $defaultMeeting = DB::table('rapat')->where('id', $defaultMeetingId)->first();
+        $this->assertSame(
+            \Illuminate\Support\Carbon::parse($defaultMeeting->tanggal.' '.$defaultMeeting->selesai)->addDays(14)->toDateTimeString(),
+            \App\Support\MeetingData::minutesDeadline($defaultMeeting)->toDateTimeString()
+        );
+
+        $this->withSession($session)->from('/admin/rapat?edit=0')
+            ->post('/admin/actions', [
+                'aksi' => 'simpan_rapat',
+                'judul' => 'Rapat Batas Tidak Diizinkan',
+                'tanggal' => now()->addDay()->toDateString(),
+                'mulai' => '13:00',
+                'selesai' => '14:00',
+                'moda' => 'Luring',
+                'semua_pegawai' => '1',
+                'batas_notulen_hari' => '2',
+            ])->assertRedirect('/admin/rapat?edit=0')
+            ->assertSessionHasErrors('batas_notulen_hari');
+        $this->assertDatabaseMissing('rapat', ['judul' => 'Rapat Batas Tidak Diizinkan']);
     }
 
     public function test_meeting_managers_and_assigned_minute_taker_can_edit_until_deadline_but_super_admins_are_exempt(): void
     {
         $this->travelTo(now()->setTime(10, 0));
+        DB::table('pengaturan')->updateOrInsert(
+            ['kunci' => 'batas_notulen_default_hari'],
+            ['nilai' => '3']
+        );
         $minuteTakerId = DB::table('pegawai')->insertGetId([
             'nip' => '123456789012345678',
             'nama' => 'Notulis Rapat',
@@ -2801,7 +3032,7 @@ class PortalTest extends TestCase
             'moda' => 'Luring',
             'notulis_pegawai_id' => $minuteTakerId,
             'notulis' => 'Notulis Rapat',
-            'batas_notulen_hari' => 3,
+            'batas_notulen_hari' => 30,
         ]);
         $minuteTakerSession = [
             'employee_id' => $minuteTakerId,
@@ -3102,6 +3333,7 @@ class PortalTest extends TestCase
             'mulai' => '09:30',
             'selesai' => '10:30',
             'moda' => 'Luring',
+            'started_at' => now()->setTime(9, 30),
             'kode_presensi' => 'HADIR7',
             'presensi_kedaluwarsa' => now()->addMinutes(20),
         ]);
@@ -3118,6 +3350,7 @@ class PortalTest extends TestCase
             ->assertSee('Kode aktif sampai')
             ->assertSee('name="kode"', false)
             ->assertSee(route('admin', 'rapat'), false)
+            ->assertDontSee('Atur presensi')
             ->assertDontSee('Pengelolaan kode presensi')
             ->assertDontSee('Kelola presensi')
             ->assertDontSee('Selesaikan Rapat')
@@ -3375,6 +3608,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(20)->format('H:i'),
             'selesai' => now()->addMinutes(40)->format('H:i'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(20),
             'notulis' => 'Notulis Lain',
         ]);
         $session = [
@@ -3430,9 +3664,16 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('Presensi rapat')
             ->assertSee('aria-label="Fitur Pengelola Rapat"', false)
+            ->assertSee('Atur presensi')
+            ->assertSee(route('admin', ['tab' => 'rapat', 'presensi' => $meetingId]), false)
             ->assertDontSee('Pengelolaan kode presensi')
             ->assertDontSee('Kelola presensi')
             ->assertDontSee('Selesaikan Rapat');
+        $this->withSession($superAdminSession)
+            ->get(route('admin', ['tab' => 'rapat', 'presensi' => $meetingId]))
+            ->assertOk()
+            ->assertSee('Presensi: Rapat Materi dan Notulen')
+            ->assertSee('Buka / perbarui presensi');
         DB::table('super_admin_permissions')->where('pegawai_id', $employeeId)->update(['lihat_daftar_hadir' => true]);
         DB::table('kehadiran')->insert([
             'rapat_id' => $meetingId,
@@ -3474,6 +3715,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subHour()->format('H:i'),
             'selesai' => now()->addHour()->format('H:i'),
             'moda' => 'Luring',
+            'started_at' => now()->subHour(),
             'kode_presensi' => 'RAPAT7',
             'presensi_kedaluwarsa' => now()->addMinutes(20)->toDateTimeString(),
         ]);
@@ -3522,6 +3764,7 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '11:00',
             'moda' => 'Luring',
+            'started_at' => now()->setTime(9, 0),
         ]);
         $session = [
             'employee_id' => $employeeId,
@@ -3632,6 +3875,7 @@ class PortalTest extends TestCase
             'mulai' => now()->subMinutes(20)->format('H:i'),
             'selesai' => now()->addMinutes(40)->format('H:i'),
             'moda' => 'Luring',
+            'started_at' => now()->subMinutes(20),
             'kode_presensi' => 'HADIR7',
             'presensi_kedaluwarsa' => now()->addMinutes(20),
         ]);
@@ -3669,6 +3913,8 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '10:00',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
             'kode_presensi_pulang' => 'PULANG9',
             'presensi_pulang_kedaluwarsa' => now()->addMinutes(20),
         ]);
@@ -3704,6 +3950,8 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '10:00',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
             'kode_presensi_pulang' => 'PULANG7',
             'presensi_pulang_kedaluwarsa' => now()->addMinutes(30),
         ]);
@@ -3753,6 +4001,7 @@ class PortalTest extends TestCase
             'mulai' => '00:00',
             'selesai' => '23:59',
             'moda' => 'Luring',
+            'started_at' => now()->subHour(),
             'kode_presensi_pulang' => 'PULANG7',
             'presensi_pulang_kedaluwarsa' => now()->addHour()->toDateTimeString(),
         ]);
@@ -3809,6 +4058,8 @@ class PortalTest extends TestCase
             'mulai' => '09:00',
             'selesai' => '10:00',
             'moda' => 'Luring',
+            'started_at' => now()->subDay()->setTime(9, 0),
+            'ended_at' => now()->subDay()->setTime(10, 0),
             'kode_presensi' => 'MASUK7',
             'presensi_kedaluwarsa' => now()->subHour(),
         ]);

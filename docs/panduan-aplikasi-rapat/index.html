@@ -257,14 +257,14 @@
             </div>
         </div>
         <div class="cover-facts">
-            <div class="cover-fact"><b>VERSI</b><span>1.0</span></div>
-            <div class="cover-fact"><b>TERBIT</b><span>2 November 2026</span></div>
+            <div class="cover-fact"><b>VERSI</b><span>1.7</span></div>
+            <div class="cover-fact"><b>TERBIT</b><span>4 November 2026</span></div>
             <div class="cover-fact"><b>PLATFORM</b><span>Aplikasi web</span></div>
             <div class="cover-fact"><b>PERAN UTAMA</b><span>3 peran akun</span></div>
         </div>
         <div class="cover-meta">
             <span>Politeknik Kesehatan Kemenkes Manado</span>
-            <span>Panduan pengguna · Versi 1.1</span>
+            <span>Panduan pengguna · Versi 1.7</span>
         </div>
     </section>
 
@@ -272,7 +272,7 @@
         <header class="section-head">
             <div class="eyebrow">Daftar isi</div>
             <h2>Buku Panduan Aplikasi Rapat</h2>
-            <p class="lead">Pilih bagian sesuai tugas dan role Anda. Nomor halaman mengikuti PDF versi 1.1 ini.</p>
+            <p class="lead">Pilih bagian sesuai tugas dan role Anda. Nomor halaman mengikuti PDF versi 1.7 ini.</p>
         </header>
         <ol class="contents-list">
             <li><a href="#page-about"><span class="contents-title">1. Tentang aplikasi</span><span class="contents-leader"></span><span class="contents-page">4</span></a></li>
@@ -305,6 +305,7 @@
             <li><a href="#page-superadmin"><span class="contents-title">10. Administrasi Super Admin</span><span class="contents-leader"></span><span class="contents-page">18</span></a></li>
             <li><a href="#page-live-board"><span class="contents-title">11. Informasi publik dan Live Board</span><span class="contents-leader"></span><span class="contents-page">19</span></a></li>
             <li><a href="#page-help"><span class="contents-title">12. Kendala umum dan keamanan</span><span class="contents-leader"></span><span class="contents-page">20</span></a></li>
+            <li><a href="#page-changelog"><span class="contents-title">Riwayat pembaruan buku panduan</span><span class="contents-leader"></span><span class="contents-page">21</span></a></li>
         </ol>
         <div class="callout">
             <strong>Untuk pembaca</strong>
@@ -333,8 +334,8 @@
             <tbody>
                 <tr><td>Pengunjung</td><td>Melihat jadwal publik, kalender, dan Live Board.</td><td>Bab 4 dan 11</td></tr>
                 <tr><td>Pegawai</td><td>Melihat detail rapat, mencatat presensi sendiri, mengajukan izin, dan menyetujui notulen jika ditugaskan.</td><td>Bab 3.1, 4, 5, 9</td></tr>
-                <tr><td>Pengelola Rapat</td><td>Mengelola rapat sesuai enam izin global yang ditetapkan Super Admin.</td><td>Bab 3.2, 6–9</td></tr>
-                <tr><td>Super Admin</td><td>Mengelola akun, role, izin, ruang, kode presensi, dan pengaturan.</td><td>Bab 3.3, 10</td></tr>
+                <tr><td>Pengelola Rapat</td><td>Mengelola rapat sesuai izin global yang ditetapkan Super Admin serta batas edit notulen.</td><td>Bab 3.2, 6–9</td></tr>
+                <tr><td>Super Admin</td><td>Mengelola akun, role, izin, ruang, kode presensi, pengaturan, serta siklus rapat manual.</td><td>Bab 3.3, 10</td></tr>
                 <tr><td>Tamu / Mahasiswa</td><td>Mengisi presensi mandiri menggunakan formulir publik dan kode dari panitia.</td><td>Bab 5</td></tr>
             </tbody>
         </table>
@@ -358,15 +359,16 @@
         <h3>1. Persiapan dan pelaksanaan</h3>
         <ol class="flow-list">
             <li><span><strong>Super Admin / Pengelola berizin:</strong> buat jadwal, pilih peserta, tetapkan pimpinan dan notulis, isi agenda.</span></li>
-            <li><span><strong>Super Admin:</strong> buka kode hadir dan informasikan kode yang aktif kepada peserta.</span></li>
+            <li><span><strong>Super Admin / Pengelola Rapat:</strong> tekan <strong>Mulai Rapat</strong> pada dashboard atau daftar Rapat saat rapat benar-benar dimulai. Jika sampai pukul 00:00 WITA setelah tanggal rapat berakhir rapat belum dimulai, sistem otomatis membatalkannya.</span></li>
+            <li><span><strong>Super Admin:</strong> buka kode hadir dan informasikan kode yang aktif kepada peserta; peserta dapat mengisi presensi setelah rapat dimulai.</span></li>
             <li><span><strong>Pegawai / Tamu / Mahasiswa:</strong> buka detail atau formulir publik, lalu isi presensi pada rapat yang tepat.</span></li>
             <li><span><strong>Pengelola:</strong> pantau rapat dan kehadiran jika izin presensi tersedia.</span></li>
         </ol>
         <h3>2. Penyelesaian dan dokumentasi</h3>
         <ol class="flow-list">
-            <li><span><strong>Pengelola atau Super Admin:</strong> selesaikan rapat yang telah berakhir; sistem membuka kode pulang otomatis 30 menit bila belum ada kode pulang aktif.</span></li>
+            <li><span><strong>Pengelola atau Super Admin:</strong> tekan <strong>Akhiri Rapat</strong> setelah rapat benar-benar berakhir. Jika belum diakhiri sampai pukul 00:00 WITA setelah tanggal rapat berakhir, sistem otomatis menyelesaikannya, mencatat overtime sampai batas waktu tersebut, dan membuka kode pulang otomatis 30 menit bila belum ada kode pulang aktif.</span></li>
             <li><span><strong>Pegawai:</strong> isi kode pulang atau tambahkan alasan bila pulang lebih dahulu/belum dapat mengisi.</span></li>
-            <li><span><strong>Notulis:</strong> lengkapi notulen. <strong>Pimpinan dan notulis:</strong> periksa dan setujui versi notulen terbaru dari menu Tanda tangan.</span></li>
+            <li><span><strong>Notulis yang ditunjuk dan Pengelola Rapat:</strong> isi/edit notulen sebelum tenggat. <strong>Pimpinan dan notulis:</strong> periksa dan setujui versi terbaru dari menu Tanda tangan.</span></li>
             <li><span><strong>Pengelola berizin:</strong> tinjau daftar hadir, proses izin, dan unduh laporan yang tersedia.</span></li>
         </ol>
         <div class="callout warning">
@@ -390,13 +392,14 @@
             <li>Mengisi absen masuk saat rapat berlangsung menggunakan kode aktif dari panitia; setelah hadir, mengisi absen pulang dengan kode terpisah.</li>
             <li>Mengajukan izin sakit, dinas, atau keperluan lain dengan alasan dan bukti bila diminta. Status izin diproses oleh pengelola yang berwenang.</li>
             <li>Mengisi alasan/keterangan jika pulang lebih dahulu atau belum berhasil mengisi absen pulang.</li>
-            <li>Membuka menu <strong>Tanda tangan</strong> dan menerima persetujuan notulen hanya jika ditetapkan sebagai pimpinan rapat atau notulis.</li>
+            <li>Membaca notulen rapat yang dapat diakses; jika ditunjuk sebagai notulis, mengisi/mengedit notulen sampai tenggat. Persetujuan dilakukan dari menu <strong>Tanda tangan</strong> jika ditetapkan sebagai pimpinan atau notulis.</li>
+            <li>Membuka avatar/inisial akun di samping nama untuk masuk ke <strong>Profil</strong>, mengganti kata sandi, atau memasang foto profil.</li>
         </ul>
         <h3>Yang tidak tersedia untuk Pegawai biasa</h3>
         <ul class="role-detail-list">
             <li>Tidak dapat membuat, mengubah, atau menghapus jadwal rapat; mengatur ruang; mengubah role/akun; atau membuka kode presensi.</li>
             <li>Tidak dapat melihat daftar identitas presensi pegawai lain, memutuskan izin pegawai lain, atau mengunduh laporan administrasi kecuali mendapat role/izin yang sesuai.</li>
-            <li>Tidak dapat mengubah kata sandi sendiri dari menu akun setelah kata sandi awal diganti. Jika lupa, hubungi Super Admin.</li>
+            <li>Pegawai yang bukan notulis rapat tidak dapat mengedit notulen. Penunjukan notulis hanya memberi akses pada rapat terkait dan tunduk pada tenggat yang sama dengan Pengelola Rapat.</li>
         </ul>
         <div class="callout">
             <strong>Langkah kerja yang disarankan</strong>
@@ -421,22 +424,25 @@
             <thead><tr><th>Izin</th><th>Jika diaktifkan, Pengelola dapat…</th></tr></thead>
             <tbody>
                 <tr><td>Buat Rapat</td><td>Membuat, mengubah, dan menghapus jadwal serta mengatur informasi, peserta, agenda, pimpinan, dan notulis.</td></tr>
-                <tr><td>Kelola Notulen</td><td>Mengisi, memperbarui, dan mengunggah PDF notulen dari detail rapat.</td></tr>
                 <tr><td>Materi Presentasi</td><td>Mengunggah atau mengelola materi rapat sesuai batas ukuran/jenis berkas yang ditampilkan.</td></tr>
                 <tr><td>Tautan Rekaman</td><td>Menambahkan tautan rekaman dan mengelola rekaman dari detail rapat.</td></tr>
                 <tr><td>Presensi &amp; Kehadiran</td><td>Melihat daftar hadir/pulang pegawai dan tamu, memproses izin, serta membuka ekspor laporan yang tersedia.</td></tr>
                 <tr><td>Kelola grup jurusan/unit undangan</td><td>Membuat atau menghapus grup dan memakai grup untuk memilih peserta rapat.</td></tr>
             </tbody>
         </table>
+        <div class="callout">
+            <strong>Notulen dan tenggat edit</strong>
+            <p class="small">Pengelola Rapat dapat mengisi/mengedit notulen sampai batas hari yang ditentukan Super Admin. Notulis yang ditunjuk untuk rapat tersebut juga dapat mengedit sampai tenggat yang sama. Setelah tenggat, hanya Super Admin yang dapat mengubah notulen.</p>
+        </div>
         <h3>Selalu dapat dilakukan saat berada pada mode Pengelola</h3>
         <ul class="role-detail-list">
-            <li>Melihat dashboard internal dan detail rapat, memakai tombol <strong>Beralih ke mode</strong> untuk kembali ke mode Pegawai, serta menandai rapat yang sedang berjalan sebagai selesai.</li>
+            <li>Melihat dashboard internal dan detail rapat, memakai tombol <strong>Beralih ke mode</strong> untuk kembali ke mode Pegawai, serta memulai dan mengakhiri rapat secara manual. Jika rapat tidak dimulai atau tidak diakhiri hingga pukul 00:00 WITA setelah tanggal rapat berakhir, sistem membatalkan atau mengakhirinya secara otomatis.</li>
             <li>Jika diberi izin presensi, meninjau daftar dan laporan. Izin ini <strong>tidak</strong> memberikan akses untuk membuat, memperpanjang, atau menutup kode hadir/pulang.</li>
-            <li>Menggunakan materi, notulen, dan rekaman yang sudah tersedia walaupun izin untuk mengubah konten tersebut tidak diaktifkan.</li>
+            <li>Menggunakan materi dan rekaman yang tersedia walaupun izin untuk mengubah konten tersebut tidak diaktifkan. Pengelolaan notulen mengikuti tenggat yang berlaku pada rapat.</li>
         </ul>
         <div class="callout warning">
             <strong>Batas akses</strong>
-            <p class="small">Pengelola Rapat tidak mengelola akun/role pegawai, pengaturan aplikasi, maupun master ruang; tidak mengatur kode presensi; dan tidak bisa mengatur ulang kata sandi. Minta Super Admin bila perlu akses tersebut.</p>
+            <p class="small">Pengelola Rapat tidak mengelola akun/role pegawai, pengaturan aplikasi, maupun master ruang; tidak mengatur kode presensi; dan tidak bisa mengatur ulang kata sandi pegawai lain. Pengelola dapat mengubah kata sandinya sendiri melalui Profil.</p>
         </div>
         <div class="callout">
             <strong>Perubahan izin berlaku bersama</strong>
@@ -456,18 +462,20 @@
         <ol class="role-detail-list">
             <li>Buka menu <strong>Pegawai</strong> untuk menambah akun dengan nama, NIP 18 digit, dan jabatan; mencari/memperbarui jabatan; mengatur role; mengatur ulang kata sandi; atau menghapus akun.</li>
             <li>Akun baru memakai NIP sebagai kata sandi awal dan wajib menggantinya saat login pertama. Saat reset kata sandi, berikan kata sandi baru secara pribadi; pegawai diwajibkan menggantinya lagi.</li>
-            <li>Buka <strong>Hak Akses</strong> untuk melihat daftar Super Admin/Pengelola Rapat serta mengaktifkan enam izin Pengelola. Perubahan izin berlaku untuk semua akun Pengelola Rapat.</li>
+            <li>Buka <strong>Hak Akses</strong> untuk melihat daftar Super Admin/Pengelola Rapat serta mengaktifkan izin operasional Pengelola. Perubahan izin berlaku untuk semua akun Pengelola Rapat.</li>
         </ol>
         <h3>Rapat, kode presensi, dan pengaturan</h3>
         <ul class="role-detail-list">
             <li>Membuat/mengubah/menghapus rapat; menentukan peserta, pimpinan, notulis, agenda, tautan, materi, dan rekaman.</li>
+            <li>Memulai rapat dengan <strong>Mulai Rapat</strong> dan mengakhirinya dengan <strong>Akhiri Rapat</strong>. Jadwal selesai tidak mengakhiri rapat otomatis; overtime dicatat hingga rapat diakhiri manual.</li>
             <li>Membuka, memperbarui, memperpanjang, atau menutup kode absen masuk dan kode pulang. Pilih kode sendiri atau biarkan sistem membuatnya otomatis; sampaikan hanya kepada peserta dan pantau masa berlakunya.</li>
             <li>Memantau presensi, memproses izin, melihat keterangan absen pulang, dan mengunduh laporan sesuai menu yang tersedia.</li>
-            <li>Membuka <strong>Ruang Rapat</strong> untuk menambah/mengaktifkan/nonaktifkan ruang, serta <strong>Pengaturan</strong> untuk menentukan apakah surat izin wajib bila tidak hadir.</li>
+            <li>Membuka <strong>Ruang Rapat</strong> untuk menambah, mengganti nama, atau menghapus ruang. Pada <strong>Pengaturan</strong>, mengatur kewajiban surat izin dan batas default edit notulen.</li>
+            <li>Menetapkan batas edit notulen global (1–365 hari) pada <strong>Pengaturan</strong>. Nilai ini berlaku untuk seluruh rapat dan dihitung sejak rapat selesai; setelah tenggat, hanya Super Admin yang dapat mengedit.</li>
         </ul>
         <div class="callout warning">
             <strong>Tindakan yang berdampak besar</strong>
-            <p class="small">Selesaikan rapat hanya bila benar-benar berakhir; kode pulang otomatis dibuka selama 30 menit jika belum ada kode aktif. Penghapusan pegawai/rapat dapat menghapus data terkait. Periksa kembali identitas, judul, dan tanggal sebelum mengonfirmasi.</p>
+            <p class="small">Akhiri rapat hanya bila benar-benar berakhir; waktu selesai aktual dan overtime tersimpan, lalu kode pulang otomatis dibuka selama 30 menit jika belum ada kode aktif. Penghapusan pegawai/rapat dapat menghapus data terkait. Periksa kembali identitas, judul, dan tanggal sebelum mengonfirmasi.</p>
         </div>
         <div class="callout">
             <strong>Petunjuk kode pulang</strong>
@@ -489,8 +497,10 @@
                 <tr><td>Lihat jadwal, detail, agenda, materi/notulen yang tersedia</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
                 <tr><td>Presensi pribadi / ajukan izin sendiri</td><td>Ya</td><td>Ya, mode Pegawai</td><td>Ya</td></tr>
                 <tr><td>Buat, ubah, dan hapus rapat</td><td>Tidak</td><td>Jika izin Buat Rapat aktif</td><td>Ya</td></tr>
-                <tr><td>Akhiri rapat yang sedang berjalan</td><td>Tidak</td><td>Ya</td><td>Ya</td></tr>
-                <tr><td>Kelola notulen, materi, dan rekaman</td><td>Tidak</td><td>Per izin masing-masing</td><td>Ya</td></tr>
+                <tr><td>Mulai dan akhiri rapat secara manual</td><td>Tidak</td><td>Ya</td><td>Ya</td></tr>
+                <tr><td>Rapat otomatis dibatalkan/diakhiri pada batas tengah malam</td><td>Tidak</td><td>Otomatis</td><td>Otomatis</td></tr>
+                <tr><td>Edit notulen</td><td>Hanya jika ditunjuk sebagai notulis, sampai tenggat</td><td>Sampai tenggat rapat</td><td>Tanpa batas waktu</td></tr>
+                <tr><td>Kelola materi dan rekaman</td><td>Tidak</td><td>Per izin masing-masing</td><td>Ya</td></tr>
                 <tr><td>Lihat daftar hadir/pulang dan proses izin orang lain</td><td>Tidak</td><td>Jika izin Presensi &amp; Kehadiran aktif</td><td>Ya</td></tr>
                 <tr><td>Buat/perpanjang/tutup kode presensi masuk dan pulang</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
                 <tr><td>Kelola akun, role, dan reset kata sandi</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
@@ -504,7 +514,7 @@
         </div>
         <div class="callout warning">
             <strong>Ketentuan kata sandi</strong>
-            <p class="small">Seluruh role memakai satu halaman Login dan NIP sendiri. Hanya Super Admin yang dapat menambah akun atau mengatur ulang kata sandi; Pengelola Rapat bukan petugas reset kata sandi.</p>
+            <p class="small">Seluruh role memakai satu halaman Login dan NIP sendiri. Setiap pengguna dapat mengganti kata sandi sendiri melalui Profil dengan memasukkan kata sandi saat ini; reset kata sandi akun lain hanya dilakukan Super Admin.</p>
         </div>
         <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Perbedaan role</span><span>09</span></footer>
     </section>
@@ -571,13 +581,14 @@
         <div class="two-col">
             <div class="mini-card">
                 <h3>Lupa kata sandi?</h3>
-                <p class="small">Hubungi Super Admin untuk mengatur ulang kata sandi. Kata sandi hasil reset wajib diganti saat login berikutnya.</p>
+                <p class="small">Jika masih dapat login, buka Profil dan ganti kata sandi dengan memasukkan kata sandi saat ini. Jika lupa dan tidak dapat login, hubungi Super Admin untuk reset; kata sandi hasil reset wajib diganti saat login berikutnya.</p>
             </div>
             <div class="mini-card">
-                <h3>Akun bersama role admin</h3>
-                <p class="small">Pengelola Rapat menggunakan NIP pegawainya sendiri. Bila tersedia, gunakan tombol mode untuk kembali ke tampilan Pegawai atau masuk ke fitur Pengelola Rapat.</p>
+                <h3>Menu Profil dan foto</h3>
+                <p class="small">Pilih avatar/foto atau inisial di samping nama akun. Pada halaman Profil, unggah foto JPG, PNG, atau WEBP (maks. 5 MB), atau ganti kata sandi minimal 8 karakter setelah memasukkan kata sandi saat ini. Jika belum ada foto, avatar menampilkan inisial nama.</p>
             </div>
         </div>
+        <p class="small">Pengelola Rapat memakai NIP sendiri. Jika memiliki role tersebut, gunakan tombol mode untuk berpindah antara fitur Pegawai dan Pengelola Rapat.</p>
         <div class="callout warning">
             <strong>Jaga akun Anda</strong>
             <p class="small">Jangan bagikan kata sandi atau kode presensi. Setelah selesai, pilih <strong>Keluar</strong>, terutama pada komputer bersama.</p>
@@ -679,7 +690,7 @@
             <li>Waktu menggunakan format 24 jam, misalnya <span class="kbd">13:30</span>. Waktu selesai harus setelah waktu mulai.</li>
             <li>Pilih rapat untuk semua pegawai atau pilih peserta per grup jurusan/unit. Buka grup, gunakan pencarian bila perlu, lalu pilih pegawai atau tombol <strong>Pilih semua pegawai dalam grup</strong>. Tombol <strong>Kosongkan pilihan grup</strong> hanya menghapus centang grup tersebut. Periksa jumlah peserta sebelum menyimpan.</li>
             <li>Lengkapi tautan rapat daring atau pemateri bila diperlukan. Tambahkan materi/rekaman hanya jika role Anda memiliki izin.</li>
-            <li>Periksa ringkasan sebelum menyimpan. Rapat yang dibuat dapat ditemukan pada daftar dan dashboard sesuai jadwalnya.</li>
+            <li>Periksa ringkasan sebelum menyimpan. Rapat yang dibuat dapat ditemukan pada dashboard dan daftar Rapat; Super Admin atau Pengelola Rapat perlu menekan <strong>Mulai Rapat</strong> untuk memulai. Rapat yang belum dimulai sampai batas tengah malam setelah tanggal rapat berakhir otomatis dibatalkan.</li>
         </ol>
         <div class="callout">
             <strong>Perubahan rapat</strong>
@@ -703,8 +714,8 @@
             <li>Pantau daftar absen masuk/pulang dan status kehadiran pada kartu rapat atau menu <strong>Kehadiran &amp; Izin</strong>.</li>
         </ol>
         <div class="callout warning">
-            <strong>Mengakhiri rapat</strong>
-            <p class="small">Tindakan <strong>Selesaikan</strong> mengakhiri rapat dan tidak dapat dibatalkan. Jika belum ada kode pulang aktif, sistem membuka kode pulang otomatis selama 30 menit. Beri tahu peserta sebelum mengakhiri rapat.</p>
+            <strong>Mulai, overtime, dan mengakhiri rapat</strong>
+            <p class="small">Rapat dimulai saat Super Admin atau Pengelola Rapat menekan <strong>Mulai Rapat</strong>. Rapat yang belum dimulai hingga pukul 00:00 WITA setelah tanggal rapat berakhir otomatis berstatus <strong>Dibatalkan</strong>. Rapat yang sudah dimulai tetap berlangsung melewati waktu selesai terjadwal sampai tombol <strong>Akhiri Rapat</strong> ditekan atau tiba pukul 00:00 WITA setelah tanggal rapat berakhir. Pada batas tersebut, sistem mengakhiri rapat, menyimpan overtime sampai tengah malam, dan membuka kode pulang otomatis selama 30 menit bila belum ada kode aktif. Pastikan Laravel Scheduler berjalan setiap menit agar penutupan dan pembatalan otomatis diproses.</p>
         </div>
         <h3>Status yang perlu diperhatikan</h3>
         <ul>
@@ -739,7 +750,7 @@
             <li>Pilih kartu rapat selesai untuk membuka rincian daftar hadir.</li>
             <li>Pilih jenis presensi <strong>Pegawai</strong> atau <strong>Tamu / Mahasiswa</strong>.</li>
             <li>Gunakan tombol <strong>Ekspor Excel</strong> untuk mengunduh daftar presensi sesuai jenis peserta.</li>
-            <li>Pada menu Rapat, gunakan <strong>Unduh PDF Notulen + Daftar Hadir</strong> jika laporan rapat sudah memenuhi persyaratan persetujuan tanda tangan.</li>
+            <li>Pada menu Rapat, gunakan <strong>Unduh PDF Notulen + Daftar Hadir</strong> setelah rapat selesai dan notulen diisi. PDF dapat diunduh sebelum persetujuan tanda tangan lengkap.</li>
         </ol>
         <h3>Memproses izin</h3>
         <p>Di bagian <strong>Daftar izin rapat</strong>, cari pengajuan yang berstatus <strong>Menunggu</strong>. Baca alasan dan bukti yang dilampirkan, lalu pilih <strong>Setujui</strong> atau <strong>Tolak</strong> sesuai kewenangan dan prosedur unit.</p>
@@ -770,14 +781,15 @@
             <span><b class="figure-number">3</b> Materi, rekaman, dan notulen</span>
         </div>
         <ol class="steps">
-            <li>Buka detail rapat, lalu lengkapi bagian <strong>Notulen rapat</strong> dengan pembahasan, kesimpulan, dan tindak lanjut.</li>
+            <li>Pengelola Rapat atau notulis yang ditunjuk membuka detail rapat, lalu mengisi/mengedit bagian <strong>Notulen rapat</strong> dengan pembahasan, kesimpulan, dan tindak lanjut sebelum tenggat.</li>
+            <li>Tenggat awal adalah 7 hari setelah rapat selesai. Super Admin dapat mengubah batas global di <strong>Pengaturan</strong> (1–365 hari); perubahan ini berlaku untuk seluruh rapat. Batas tidak diatur pada formulir masing-masing rapat.</li>
             <li>Setelah rapat selesai, pimpinan dan notulis yang ditugaskan membuka menu <strong>Tanda tangan</strong>.</li>
             <li>Baca detail rapat dan notulen. Pilih <strong>Terima &amp; setujui</strong> hanya jika dokumen sudah diperiksa.</li>
-            <li>Setelah kedua pihak menyetujui notulen versi terbaru, laporan PDF dapat diunduh. QR pada dokumen mengarah ke halaman verifikasi aplikasi.</li>
+            <li>PDF notulen dan daftar hadir dapat diunduh setelah rapat selesai dan notulen diisi, tanpa menunggu persetujuan tanda tangan. QR pada kolom pimpinan dan notulis mengarah ke halaman verifikasi aplikasi.</li>
         </ol>
         <div class="callout warning">
             <strong>Perubahan dokumen</strong>
-            <p class="small">Jika isi rapat atau notulen berubah setelah persetujuan, tanda tangan untuk versi lama tidak lagi berlaku dan perlu diminta kembali. QR aplikasi adalah verifikasi internal, bukan sertifikat tanda tangan elektronik BSrE.</p>
+            <p class="small">Sebelum pimpinan dan notulis mengonfirmasi tanda tangan digital, hasil pindai QR menampilkan status <strong>Surat Belum Terverifikasi</strong> beserta informasi rapat pada halaman verifikasi. Setelah kedua pihak menyetujui notulen versi terbaru, status berubah menjadi terverifikasi. Setelah tenggat, Pengelola Rapat dan notulis tidak dapat mengubah notulen; hanya Super Admin yang dapat mengedit. Jika isi rapat atau notulen berubah setelah persetujuan, tanda tangan untuk versi lama tidak lagi berlaku dan perlu diminta kembali. QR aplikasi adalah verifikasi internal, bukan sertifikat tanda tangan elektronik BSrE.</p>
         </div>
         <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>17</span></footer>
     </section>
@@ -802,7 +814,7 @@
             <div class="mini-card">
                 <h3>Hak akses pengelola</h3>
                 <ul class="small">
-                    <li>Aktifkan izin Pengelola Rapat untuk rapat, materi, rekaman, notulen, daftar hadir, dan grup undangan sesuai kebijakan.</li>
+                    <li>Aktifkan izin operasional Pengelola Rapat untuk rapat, materi, rekaman, daftar hadir, dan grup undangan sesuai kebijakan. Tenggat edit notulen diatur pada Pengaturan, bukan melalui centang izin ini.</li>
                     <li>Izin Pengelola Rapat berlaku pada seluruh akun dengan role tersebut.</li>
                     <li>Pengelolaan ruang hanya dapat dilakukan Super Admin; batasi jumlah akun Super Admin sesuai kebijakan institusi.</li>
                 </ul>
@@ -816,7 +828,7 @@
         </ol>
         <p class="small">Akun pegawai baru dapat langsung diberi grup melalui pilihan <strong>Grup undangan</strong> pada formulir Tambah pegawai.</p>
         <h3>Ruang &amp; pengaturan</h3>
-        <p>Menu <strong>Ruang Rapat</strong> digunakan untuk menambah ruang atau mengaktifkan/nonaktifkan ruang. Ruang nonaktif tidak dapat dipilih untuk rapat baru. Menu <strong>Pengaturan</strong> memuat pengaturan aplikasi yang hanya dapat diubah oleh Super Admin.</p>
+        <p>Menu <strong>Ruang Rapat</strong> digunakan untuk menambah ruang, mengganti nama, atau menghapus ruang. Menu <strong>Pengaturan</strong> memuat kewajiban surat izin dan batas global pengisian/edit notulen yang hanya dapat diubah Super Admin.</p>
         <div class="callout warning">
             <strong>Hati-hati saat menghapus</strong>
             <p class="small">Menghapus pegawai atau rapat dapat memengaruhi presensi dan data yang terkait. Periksa identitas serta konfirmasi tindakan sebelum menyimpan.</p>
@@ -869,7 +881,8 @@
                 <tr><td>Menu admin tidak ada</td><td>Pastikan role dan izin akun sudah diberikan. Tidak semua pegawai dapat melihat semua tab.</td></tr>
                 <tr><td>Presensi belum bisa dikirim</td><td>Pastikan rapat yang benar dipilih, kode sesuai, dan presensi sedang dibuka/belum kedaluwarsa.</td></tr>
                 <tr><td>Rapat tidak muncul</td><td>Periksa tanggal, status filter, dan pencarian. Tanyakan kepada pengelola jika jadwal seharusnya tersedia.</td></tr>
-                <tr><td>Ekspor/laporan tidak tersedia</td><td>Periksa izin akses dan status rapat. PDF notulen memerlukan persetujuan yang masih berlaku untuk versi dokumen terbaru.</td></tr>
+                <tr><td>Ekspor/laporan tidak tersedia</td><td>Periksa izin akses, status rapat sudah selesai, dan notulen sudah diisi. Persetujuan tanda tangan tidak diperlukan untuk mengunduh PDF.</td></tr>
+                <tr><td>Tombol edit notulen tidak muncul</td><td>Hanya Pengelola Rapat, Super Admin, atau Notulis yang ditetapkan pada rapat terkait yang dapat mengedit. Periksa apakah tenggat rapat sudah berakhir; setelah tenggat hanya Super Admin yang dapat mengedit.</td></tr>
                 <tr><td>Server lokal tidak dapat dibuka</td><td>Minta administrator memastikan layanan aplikasi, basis data, dan jaringan aktif. Alamat 127.0.0.1 hanya berlaku pada komputer server.</td></tr>
             </tbody>
         </table>
@@ -887,9 +900,62 @@
         </div>
         <div class="cover-meta">
             <span>Politeknik Kesehatan Kemenkes Manado</span>
-            <span>Panduan pengguna · November 2026</span>
+            <span>Panduan pengguna · Versi 1.7 · 4 November 2026</span>
         </div>
         <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat</span><span>20</span></footer>
+    </section>
+
+    <section class="page">
+        <a id="page-changelog"></a>
+        <header class="section-head">
+            <div class="eyebrow">Lampiran · Riwayat versi</div>
+            <h2>Riwayat pembaruan buku panduan</h2>
+            <p>Ringkasan perubahan panduan dan alur aplikasi menurut versi penerbitan.</p>
+        </header>
+        <table class="role-grid compact">
+            <thead>
+                <tr><th>Versi</th><th>Ringkasan perubahan</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>1.0</strong><br><span class="small">Edisi awal</span></td>
+                    <td>Panduan dasar penggunaan aplikasi: pengenalan, role pengguna, dashboard, jadwal rapat, presensi, notulen, laporan, dan bantuan.</td>
+                </tr>
+                <tr>
+                    <td><strong>1.1</strong></td>
+                    <td>Penyempurnaan penjelasan alur penggunaan dan pembagian akses Pegawai, Pengelola Rapat, serta Super Admin.</td>
+                </tr>
+                <tr>
+                    <td><strong>1.2</strong></td>
+                    <td>Pembaruan petunjuk operasional rapat, presensi, administrasi, dan dokumentasi berdasarkan pengembangan aplikasi.</td>
+                </tr>
+                <tr>
+                    <td><strong>1.3</strong></td>
+                    <td>Menjelaskan batas pengisian dan pengubahan notulen yang dikendalikan Super Admin melalui pengaturan global dan berlaku untuk rapat.</td>
+                </tr>
+                <tr>
+                    <td><strong>1.4</strong></td>
+                    <td>Menjelaskan bahwa PDF notulen dapat diunduh sebelum semua tanda tangan disetujui serta perbedaan status verifikasi dokumen.</td>
+                </tr>
+                <tr>
+                    <td><strong>1.5</strong></td>
+                    <td>Menambahkan alur mulai dan akhiri rapat secara manual serta pencatatan overtime setelah jadwal selesai.</td>
+                </tr>
+                <tr>
+                    <td><strong>1.6</strong></td>
+                    <td>Menambahkan pembatalan otomatis rapat yang belum dimulai dan pengakhiran otomatis rapat aktif pada tengah malam setelah tanggal rapat.</td>
+                </tr>
+                <tr>
+                    <td><strong>1.7</strong><br><span class="small">4 November 2026</span></td>
+                    <td>Menambahkan halaman riwayat versi 1.0–1.6 ke dalam buku dan menyinkronkan nomor versi edisi ini.</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="callout">
+            <strong>Catatan versi</strong>
+            <p class="small">Edisi 1.0–1.2 diringkas sebagai tahap penyusunan dan penyempurnaan panduan dasar. Rincian perubahan spesifik yang terdokumentasi tersedia mulai versi 1.3.</p>
+        </div>
+        <footer class="page-footer"><span>Buku Panduan Aplikasi Rapat · Riwayat pembaruan</span><span>21</span></footer>
     </section>
 </body>
 </html>

@@ -24,7 +24,9 @@
             </div>
             <div class="signature-request-action">
                 @if(!$signature->can_sign)
-                    @if(\App\Support\MeetingData::scheduleStatus($signature) !== 'selesai')
+                    @if(\App\Support\MeetingData::scheduleStatus($signature) === 'dibatalkan')
+                        <span class="signature-pending-status">Rapat dibatalkan</span>
+                    @elseif(\App\Support\MeetingData::scheduleStatus($signature) !== 'selesai')
                         <span class="signature-pending-status">Menunggu rapat selesai</span>
                     @else
                         <span class="signature-pending-status">Menunggu notulen diisi</span>

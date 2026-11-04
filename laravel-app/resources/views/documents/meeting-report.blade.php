@@ -29,13 +29,17 @@
         .qr { display: block; width: 90px; height: 90px; margin: 8pt auto 4pt; }
         .signer-name { font-weight: bold; text-decoration: underline; }
         .signer-status { color: #075e59; font-size: 8pt; }
+        .signer-status.is-pending { color: #9a5a14; }
         .page-break { page-break-before: always; }
         .verification-note { margin-top: 10pt; color: #546575; font-size: 8pt; text-align: center; }
         .footer { position: fixed; right: 0; bottom: -13mm; left: 0; color: #617283; font-size: 8pt; text-align: center; }
     </style>
 </head>
 <body>
-    <div class="footer">Dokumen disetujui secara elektronik · Verifikasi tanda tangan melalui QR pada dokumen</div>
+    <div class="footer">
+        {{ $allSignaturesApproved ? 'Dokumen telah dikonfirmasi secara elektronik' : 'Dokumen belum terverifikasi secara digital' }}
+        · Pindai QR pada dokumen untuk memeriksa status persetujuan
+    </div>
     <header class="institution">
         <strong>KEMENTERIAN KESEHATAN REPUBLIK INDONESIA</strong>
         <span>POLTEKKES KEMENKES MANADO</span>
@@ -81,12 +85,16 @@
                 <td>
                     <img class="qr" src="{{ $signature->qr_code }}" alt="QR verifikasi tanda tangan {{ $signature->pegawai_nama }}">
                     <div class="signer-name">{{ $signature->pegawai_nama }}</div>
-                    <div class="signer-status">Disetujui {{ $signature->accepted_at_label }}</div>
+                    <div class="signer-status {{ $signature->accepted_at_label ? '' : 'is-pending' }}">
+                        {{ $signature->accepted_at_label ? 'Disetujui '.$signature->accepted_at_label : 'Belum dikonfirmasi' }}
+                    </div>
                 </td>
             @endforeach
         </tr>
     </table>
-    <p class="verification-note">Pindai QR untuk memeriksa identitas penanda tangan, rapat, dan waktu persetujuan.</p>
+    <p class="verification-note">
+        {{ $allSignaturesApproved ? 'Pindai QR untuk memeriksa identitas penanda tangan, rapat, dan waktu persetujuan.' : 'Dokumen ini dapat diunduh sebelum persetujuan lengkap. Status akan menjadi terverifikasi setelah pimpinan rapat dan notulis mengonfirmasi tanda tangan digital.' }}
+    </p>
 
     <section class="page-break">
         <div class="title">

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $valid ? 'Notulen Rapat Terverifikasi' : 'Verifikasi Notulen Rapat' }} – Poltekkes Kemenkes Manado</title>
+    <title>{{ $valid ? 'Notulen Rapat Terverifikasi' : ($pending ? 'Surat Belum Terverifikasi' : 'Persetujuan Tidak Terverifikasi') }} – Poltekkes Kemenkes Manado</title>
     @vite(['resources/css/app.css'])
 </head>
 <body class="min-h-screen antialiased">
@@ -15,13 +15,15 @@
         </header>
 
         <section class="signature-verify-card">
-            <div class="signature-verify-banner {{ $valid ? 'is-valid' : 'is-invalid' }}">
-                <span class="signature-verify-mark" aria-hidden="true">{{ $valid ? '✓' : '!' }}</span>
+            <div class="signature-verify-banner {{ $valid ? 'is-valid' : ($pending ? 'is-pending' : 'is-invalid') }}">
+                <span class="signature-verify-mark" aria-hidden="true">{{ $valid ? '✓' : ($pending ? '…' : '!') }}</span>
                 <div>
-                    <h1>{{ $valid ? 'Notulen Rapat Terverifikasi' : 'Persetujuan Tidak Terverifikasi' }}</h1>
+                    <h1>{{ $valid ? 'Notulen Rapat Terverifikasi' : ($pending ? 'Surat Belum Terverifikasi' : 'Persetujuan Tidak Terverifikasi') }}</h1>
                     <p>
                         @if($valid)
                             Disetujui dan ditandatangani {{ $signature->peran === 'pimpinan' ? 'pimpinan rapat' : 'notulis' }}, tercatat dalam sistem.
+                        @elseif($pending)
+                            Notulen ini belum terverifikasi karena persetujuan tanda tangan digital dari pimpinan rapat dan notulis belum lengkap.
                         @else
                             QR tidak cocok dengan persetujuan aktif. Dokumen mungkin berubah atau QR berasal dari versi lama.
                         @endif

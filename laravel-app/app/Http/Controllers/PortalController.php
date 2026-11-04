@@ -155,16 +155,17 @@ class PortalController extends Controller
             ->get();
         MeetingData::assignSlugs($meetings);
 
-        $byStatus = ['akan' => collect(), 'berlangsung' => collect(), 'selesai' => collect()];
+        $byStatus = ['akan' => collect(), 'berlangsung' => collect(), 'selesai' => collect(), 'dibatalkan' => collect()];
         $waiting = collect();
         foreach ($meetings as $meeting) {
             $status = MeetingData::scheduleStatus($meeting);
             $byStatus[$status]->push($meeting);
-            if ($employee && $status !== 'selesai' && !$meeting->status_kehadiran && $meeting->tanggal <= now()->addDays(7)->toDateString()) {
+            if ($employee && in_array($status, ['akan', 'berlangsung'], true) && !$meeting->status_kehadiran && $meeting->tanggal <= now()->addDays(7)->toDateString()) {
                 $waiting->push($meeting);
             }
         }
         $byStatus['selesai'] = $byStatus['selesai']->sortByDesc(fn ($meeting) => $meeting->tanggal.$meeting->mulai)->values();
+        $byStatus['dibatalkan'] = $byStatus['dibatalkan']->sortByDesc(fn ($meeting) => $meeting->tanggal.$meeting->mulai)->values();
         $calendarEvents = $meetings->filter(fn ($meeting) => $employee || $this->isAdminMode() || MeetingData::scheduleStatus($meeting) !== 'selesai')
             ->map(fn ($meeting) => ['date' => $meeting->tanggal, 'title' => $meeting->judul, 'id' => (int) $meeting->id, 'slug' => $meeting->meeting_slug])
             ->values();
@@ -396,9 +397,7 @@ class PortalController extends Controller
             'notulis_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'pemateri' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string'],
-            'batas_notulen_hari' => $isSuperAdmin
-                ? ['sometimes', 'required', 'integer', 'between:1,365']
-                : ['prohibited'],
+            'batas_notulen_hari' => ['prohibited'],
             'notulen' => ['prohibited'],
             'file_notulen' => ['prohibited'],
             'materi' => ['nullable', 'file', 'mimes:pdf,ppt,pptx,odp,doc,docx,xls,xlsx,ods,zip,jpg,jpeg,png', 'max:20480'],
@@ -466,7 +465,6 @@ class PortalController extends Controller
                 'agenda' => $data['agenda'] ?? '',
                 'link_rekaman' => $data['link_rekaman'] ?? null,
                 'materi_rapat' => $materialFilename,
-                'batas_notulen_hari' => (int) ($data['batas_notulen_hari'] ?? MeetingData::setting('batas_notulen_default_hari', '7')),
             ]);
             $this->saveMeetingParticipants($meetingId, $participantIds);
             if ($material) {
@@ -516,7 +514,6 @@ class PortalController extends Controller
         }
 
         $meetings = DB::table('rapat')
-            ->whereDate('tanggal', now()->toDateString())
             ->when($room, fn ($query) => $query->where('room_id', $room->id))
             ->orderBy('mulai')
             ->get()
@@ -541,8 +538,9 @@ class PortalController extends Controller
                     'title' => $meeting->judul,
                     'date' => $meeting->tanggal,
                     'start' => substr($meeting->mulai, 0, 5),
-                    'started_at' => \Illuminate\Support\Carbon::parse($meeting->tanggal.' '.$meeting->mulai, config('app.timezone'))->toIso8601String(),
+                    'started_at' => \Illuminate\Support\Carbon::parse($meeting->started_at, config('app.timezone'))->toIso8601String(),
                     'end' => substr($meeting->selesai, 0, 5),
+                    'scheduled_end_at' => \Illuminate\Support\Carbon::parse($meeting->tanggal.' '.$meeting->selesai, config('app.timezone'))->toIso8601String(),
                     'place' => $meeting->tempat ?: 'Tempat belum ditentukan',
                     'mode' => $meeting->moda,
                     'attendee_count' => (int) ($attendeeCounts[$meeting->id] ?? 0),
@@ -650,20 +648,17 @@ class PortalController extends Controller
                 's.document_hash',
                 'p.nama as pegawai_nama',
             ]);
-        if (
-            $signatures->count() !== 2
-            || $signatures->contains(fn ($signature) => $signature->status !== 'disetujui'
-                || !hash_equals((string) $signature->document_hash, $documentHash))
-        ) {
-            return back()->withErrors(['tanda_tangan' => 'PDF final hanya tersedia setelah pimpinan rapat dan notulis menyetujui notulen versi terbaru.']);
-        }
+        $allSignaturesApproved = $signatures->count() === 2
+            && $signatures->every(fn ($signature) => $signature->status === 'disetujui'
+                && hash_equals((string) $signature->document_hash, $documentHash));
 
         $pdf = MeetingReportDocument::render(
             $meetingRecord,
             $reportData['attendanceRows']->all(),
             $reportData['followUps']->all(),
             $signatures->all(),
-            rtrim((string) config('app.url'), '/').'/signatures/verify'
+            rtrim((string) config('app.url'), '/').'/signatures/verify',
+            $allSignaturesApproved
         );
         $filename = (Str::slug($meetingRecord->judul) ?: 'rapat').'-notulen-daftar-hadir.pdf';
 
@@ -693,7 +688,7 @@ class PortalController extends Controller
             ->orderByDesc('r.mulai')
             ->get([
                 'r.id as id',
-                's.id',
+                's.id as signature_id',
                 's.rapat_id',
                 'r.room_id',
                 's.peran',
@@ -722,7 +717,7 @@ class PortalController extends Controller
                     $meeting = DB::table('rapat')->where('id', $signature->rapat_id)->first();
                     $documentHash = $this->meetingReportHash($meeting, $this->meetingReportData($meeting));
                     $this->resetStaleMeetingSignatures($signature->rapat_id, $documentHash);
-                    $current = DB::table('meeting_signatures')->where('id', $signature->id)->first();
+                    $current = DB::table('meeting_signatures')->where('id', $signature->signature_id)->first();
                     $signature->status = $current->status;
                     $signature->disetujui_pada = $current->disetujui_pada;
                 }
@@ -810,6 +805,7 @@ class PortalController extends Controller
             return response()->view('signatures.verify', [
                 'signature' => null,
                 'valid' => false,
+                'pending' => false,
                 'verificationCode' => $verificationCode,
             ]);
         }
@@ -827,10 +823,14 @@ class PortalController extends Controller
             && $signature->document_hash
             && hash_equals($signature->document_hash, $documentHash)
             && $bothApproved;
+        $pending = $signature->status !== 'disetujui'
+            || !$signature->document_hash
+            || hash_equals((string) $signature->document_hash, $documentHash);
 
         return response()->view('signatures.verify', [
             'signature' => $signature,
             'valid' => $valid,
+            'pending' => !$valid && $pending,
             'verificationCode' => $verificationCode,
         ]);
     }
@@ -1357,6 +1357,19 @@ class PortalController extends Controller
                 abort_unless($this->isSuperAdminMode() || $permissions['buat_rapat'], 403);
                 return $this->saveAdminMeeting($request, $id);
 
+            case 'mulai_rapat':
+                abort_unless($this->isAdminMode(), 403);
+                $meeting = DB::table('rapat')->where('id', $id)->first();
+                abort_unless($meeting !== null, 404);
+                abort_unless(MeetingData::canManuallyStart($meeting), 409, 'Rapat sudah dimulai atau diselesaikan.');
+                $updated = DB::table('rapat')->where('id', $id)
+                    ->whereNull('started_at')
+                    ->whereNull('ended_at')
+                    ->whereNull('cancelled_at')
+                    ->update(['started_at' => now()]);
+                abort_unless($updated === 1, 409, 'Rapat sudah dimulai atau diselesaikan.');
+                return redirect()->route('admin', 'rapat')->with('status', 'Rapat "'.$meeting->judul.'" berhasil dimulai.');
+
             case 'selesaikan_rapat':
                 abort_unless($this->isAdminMode(), 403);
                 $meeting = DB::table('rapat')->where('id', $id)->first();
@@ -1371,6 +1384,7 @@ class PortalController extends Controller
                     'ended_at' => $endedAt,
                     'kode_presensi_pulang' => $checkoutCode,
                     'presensi_pulang_kedaluwarsa' => $endedAt->copy()->addMinutes(30),
+                    'overtime_minutes' => MeetingData::overtimeMinutes((object) array_merge((array) $meeting, ['ended_at' => $endedAt])),
                 ]);
                 abort_unless($updated === 1, 409, 'Rapat sudah diselesaikan.');
                 return redirect()->route('admin', 'rapat')->with('status', 'Rapat "'.$meeting->judul.'" telah ditandai sebagai selesai.');
@@ -1457,9 +1471,7 @@ class PortalController extends Controller
             'notulis' => ['nullable', 'string', 'max:200'],
             'pemateri' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string'],
-            'batas_notulen_hari' => $isSuperAdmin
-                ? ['sometimes', 'required', 'integer', 'between:1,365']
-                : ['prohibited'],
+            'batas_notulen_hari' => ['prohibited'],
             'pimpinan_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'notulis_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'link_rekaman' => ['nullable', 'url', 'regex:#^https://(drive|docs)\.google\.com/|^https://(www\.)?youtube\.com/|^https://youtu\.be/#i'],
@@ -1514,9 +1526,6 @@ class PortalController extends Controller
             'notulis_pegawai_id' => $minuteTakerId,
             'pemateri' => $data['pemateri'] ?? '',
             'agenda' => $data['agenda'] ?? '',
-            'batas_notulen_hari' => $isSuperAdmin
-                ? (int) ($data['batas_notulen_hari'] ?? $old->batas_notulen_hari ?? MeetingData::setting('batas_notulen_default_hari', '7'))
-                : (int) ($old->batas_notulen_hari ?? MeetingData::setting('batas_notulen_default_hari', '7')),
             'link_rekaman' => $canManageRecordings ? ($data['link_rekaman'] ?? null) : ($old->link_rekaman ?? null),
             'notulen' => $old->notulen ?? '',
         ];
@@ -1585,6 +1594,10 @@ class PortalController extends Controller
         ]);
         $option = $data['opsi_presensi'];
         $isCheckout = str_ends_with($option, '_pulang');
+        if (MeetingData::scheduleStatus($meeting) === 'dibatalkan') {
+            return redirect()->route('admin', ['tab' => 'rapat', 'presensi' => $id])
+                ->withErrors(['presensi' => 'Rapat dibatalkan; kode presensi tidak dapat dibuka atau diubah.']);
+        }
         if (MeetingData::scheduleStatus($meeting) === 'selesai' && !$isCheckout) {
             return redirect()->route('admin', ['tab' => 'rapat', 'presensi' => $id])
                 ->withErrors(['presensi' => 'Rapat sudah selesai; presensi hanya dapat ditinjau.']);
@@ -1650,7 +1663,7 @@ class PortalController extends Controller
                 MeetingData::scheduleStatus($meeting) === 'berlangsung'
                 && MeetingData::attendanceOpen($meeting)
             ) || (
-                MeetingData::scheduleStatus($meeting) !== 'akan'
+                in_array(MeetingData::scheduleStatus($meeting), ['berlangsung', 'selesai'], true)
                 && MeetingData::checkoutOpen($meeting)
             ))
             ->values();
@@ -1687,7 +1700,7 @@ class PortalController extends Controller
 
         $submittedCode = strtoupper(trim($data['kode']));
         if (
-            MeetingData::scheduleStatus($record) !== 'akan'
+            in_array(MeetingData::scheduleStatus($record), ['berlangsung', 'selesai'], true)
             && MeetingData::checkoutOpen($record)
             && hash_equals(strtoupper(trim((string) $record->kode_presensi_pulang)), $submittedCode)
         ) {
@@ -1866,6 +1879,18 @@ class PortalController extends Controller
             ? DB::table('kehadiran')->where('rapat_id', $meeting)->where('pegawai_id', $employee->id)->first()
             : null;
 
+        if ($action === 'mulai_rapat') {
+            abort_unless($admin, 403);
+            abort_unless(MeetingData::canManuallyStart($record), 409, 'Rapat sudah dimulai atau diselesaikan.');
+            $updated = DB::table('rapat')->where('id', $meeting)
+                ->whereNull('started_at')
+                ->whereNull('ended_at')
+                ->whereNull('cancelled_at')
+                ->update(['started_at' => now()]);
+            abort_unless($updated === 1, 409, 'Rapat sudah dimulai atau diselesaikan.');
+            return back()->with('status', 'Rapat berhasil dimulai.');
+        }
+
         if ($action === 'hadir') {
             abort_unless($employee && !$attendance, 403);
             if (MeetingData::scheduleStatus($record) !== 'berlangsung') {
@@ -1908,6 +1933,7 @@ class PortalController extends Controller
                 'ended_at' => $endedAt,
                 'kode_presensi_pulang' => $checkoutCode,
                 'presensi_pulang_kedaluwarsa' => $checkoutExpires,
+                'overtime_minutes' => MeetingData::overtimeMinutes((object) array_merge((array) $record, ['ended_at' => $endedAt])),
             ]);
             abort_unless($updated === 1, 409, 'Rapat sudah diselesaikan.');
 
@@ -1925,7 +1951,7 @@ class PortalController extends Controller
             );
             $scheduleStatus = MeetingData::scheduleStatus($record);
             if (
-                $scheduleStatus === 'akan'
+                !in_array($scheduleStatus, ['berlangsung', 'selesai'], true)
                 || !MeetingData::checkoutOpen($record)
             ) {
                 return back()->withErrors(['presensi_pulang' => 'Kode absen pulang belum dibuka atau masa berlakunya telah berakhir.']);
