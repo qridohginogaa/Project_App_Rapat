@@ -171,7 +171,7 @@
         </tbody>
     </table></div>
     <h3 class="mt-5">Hak Akses Pengelola Rapat</h3>
-    <p class="mu">Centang fitur yang dapat digunakan oleh semua akun dengan role Pengelola Rapat.</p>
+    <p class="mu">Fitur Kelola Notulen tersedia untuk semua akun Pengelola Rapat. Centang fitur lain yang ingin diberikan.</p>
     <form method="post" action="{{ route('admin.action') }}" class="box mt-3">
         @csrf
         <input type="hidden" name="aksi" value="atur_hak_akses_admin">
@@ -179,10 +179,6 @@
             <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
                 <input type="checkbox" name="buat_rapat" value="1" @checked($managerAccessSettings->buat_rapat) style="width:auto;margin:0;">
                 <span>Buat Rapat</span>
-            </label>
-            <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
-                <input type="checkbox" name="notulen" value="1" @checked($managerAccessSettings->notulen) style="width:auto;margin:0;">
-                <span>Kelola Notulen</span>
             </label>
             <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
                 <input type="checkbox" name="materi" value="1" @checked($managerAccessSettings->materi) style="width:auto;margin:0;">
@@ -582,7 +578,7 @@
     </div>
 @elseif($tab === 'rapat')
     @if(request()->has('edit'))
-        @php($meeting = $editMeeting ?: (object) ['id' => 0, 'judul' => '', 'tanggal' => now()->toDateString(), 'mulai' => '09:00:00', 'selesai' => '11:00:00', 'tempat' => '', 'room_id' => null, 'link_meeting' => '', 'moda' => 'Luring', 'pimpinan' => '', 'notulis' => '', 'pemateri' => '', 'agenda' => '', 'link_rekaman' => '', 'notulen' => '', 'file_notulen' => '', 'materi_rapat' => ''])
+        @php($meeting = $editMeeting ?: (object) ['id' => 0, 'judul' => '', 'tanggal' => now()->toDateString(), 'mulai' => '09:00:00', 'selesai' => '11:00:00', 'tempat' => '', 'room_id' => null, 'link_meeting' => '', 'moda' => 'Luring', 'pimpinan' => '', 'notulis' => '', 'pemateri' => '', 'agenda' => '', 'link_rekaman' => '', 'notulen' => '', 'file_notulen' => '', 'materi_rapat' => '', 'batas_notulen_hari' => \App\Support\MeetingData::setting('batas_notulen_default_hari', '7')])
         <section class="meeting-create-section admin-meeting-create">
             <div class="dashboard-section-heading"><h2>{{ $meeting->id ? 'Ubah rapat' : 'Tambah rapat' }}</h2></div>
             <div class="meeting-create-panel">
@@ -649,6 +645,9 @@
                             <p class="mu">Tambahkan agenda dan materi pendukung. Notulen diisi melalui halaman detail saat rapat berlangsung atau setelah rapat selesai.</p>
                             <div class="meeting-form-grid">
                                 <div class="meeting-form-field meeting-form-field-wide"><label>Agenda</label><textarea name="agenda" rows="4">{{ old('agenda', $meeting->agenda) }}</textarea></div>
+                                @if($isSuperAdmin)
+                                    <div class="meeting-form-field"><label for="minutes-deadline-days">Batas pengisian notulen (hari)</label><input id="minutes-deadline-days" type="number" name="batas_notulen_hari" min="1" max="365" value="{{ old('batas_notulen_hari', $meeting->batas_notulen_hari) }}" required><small class="mu">Dihitung sejak rapat selesai. Setelah batas ini, hanya Super Admin dan Pengelola Rapat yang dapat mengedit.</small></div>
+                                @endif
                                 @if($canManageMaterials)
                                     <div class="meeting-form-field meeting-form-field-wide"><label>Unggah materi <span>(maks. 20 MB)</span></label><input type="file" name="materi_rapat" accept=".pdf,.ppt,.pptx,.doc,.docx,.zip"></div>
                                     @if($meeting->materi_rapat)<label class="meeting-form-field-wide meeting-remove-file"><input type="checkbox" name="hapus_materi_rapat" value="1" style="width:auto"> Hapus materi lama saat menyimpan</label>@endif
@@ -938,6 +937,11 @@
     <form method="post" action="{{ route('admin.action') }}" class="box">@csrf<input type="hidden" name="aksi" value="simpan_pengaturan">
         <b>Aturan presensi &amp; kehadiran</b>
         <label><input type="checkbox" name="wajib_izin" value="1" style="width:auto" @checked(\App\Support\MeetingData::setting('wajib_izin', '1') === '1')> Wajib surat izin bila tidak hadir</label>
+        <hr class="my-4">
+        <b>Batas pengisian dan pengubahan notulen</b>
+        <p class="mu">Batas awal untuk rapat baru. Super Admin dapat mengatur batas berbeda pada setiap rapat. Notulis yang ditetapkan dapat mengisi atau mengubah notulen sampai tenggat; setelah itu hanya Super Admin dan Pengelola Rapat.</p>
+        <label for="minutes-default-days">Batas default (hari setelah rapat selesai)</label>
+        <input id="minutes-default-days" type="number" name="batas_notulen_default_hari" min="1" max="365" value="{{ old('batas_notulen_default_hari', \App\Support\MeetingData::setting('batas_notulen_default_hari', '7')) }}" required>
         <button class="btn pri mt-3">Simpan</button>
     </form>
 @endif

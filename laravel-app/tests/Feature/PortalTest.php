@@ -1204,6 +1204,82 @@ class PortalTest extends TestCase
             ->assertDontSee('Rapat untuk semua pegawai');
     }
 
+    public function test_employee_can_change_password_from_profile_after_verifying_current_password(): void
+    {
+        $passwordHash = Hash::make('kata-sandi-lama');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Profil',
+            'jabatan' => 'Dosen',
+            'password_hash' => $passwordHash,
+        ]);
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+        ];
+
+        $this->withSession($session)->get(route('profile'))
+            ->assertOk()
+            ->assertSee('Ganti kata sandi')
+            ->assertSee('Foto profil')
+            ->assertSee(route('profile'))
+            ->assertSee('profile-nav-avatar-fallback')
+            ->assertSee('>pp</span>', false)
+            ->assertSee('Pegawai Profil');
+
+        $this->withSession($session)->post(route('profile.password.update'), [
+            'current_password' => 'sandi-salah',
+            'password' => 'kata-sandi-baru',
+            'password_confirmation' => 'kata-sandi-baru',
+        ])->assertSessionHasErrors('current_password');
+
+        $this->withSession($session)->post(route('profile.password.update'), [
+            'current_password' => 'kata-sandi-lama',
+            'password' => 'kata-sandi-baru',
+            'password_confirmation' => 'kata-sandi-baru',
+        ])->assertRedirect(route('profile'))
+            ->assertSessionHas('status', 'Kata sandi berhasil diubah.');
+
+        $updatedHash = DB::table('pegawai')->where('id', $employeeId)->value('password_hash');
+        $this->assertTrue(Hash::check('kata-sandi-baru', $updatedHash));
+        $this->assertSame($updatedHash, session('employee_password_hash'));
+        $this->get(route('profile'))->assertOk();
+    }
+
+    public function test_employee_can_upload_and_view_private_profile_photo(): void
+    {
+        Storage::fake('meeting_uploads');
+        $passwordHash = Hash::make('password-tes');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Pegawai Foto',
+            'jabatan' => 'Dosen',
+            'password_hash' => $passwordHash,
+        ]);
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+        ];
+
+        $this->withSession($session)->post(route('profile.photo.update'), [
+            'profile_photo' => \Illuminate\Http\UploadedFile::fake()->createWithContent(
+                'foto-profil.png',
+                base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/qE0AAAAASUVORK5CYII=')
+            ),
+        ])->assertRedirect(route('profile'))
+            ->assertSessionHas('status', 'Foto profil berhasil diperbarui.');
+
+        $filename = DB::table('pegawai')->where('id', $employeeId)->value('profile_photo');
+        $this->assertNotEmpty($filename);
+        Storage::disk('meeting_uploads')->assertExists($filename);
+        $this->withSession($session)->get(route('profile.photo'))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+        $this->withSession($session)->get(route('profile'))
+            ->assertOk()
+            ->assertSee(route('profile.photo'));
+    }
+
     public function test_employee_with_initial_password_must_change_it_before_using_meeting_features(): void
     {
         $employeeId = DB::table('pegawai')->insertGetId([
@@ -2366,6 +2442,46 @@ class PortalTest extends TestCase
             ->assertDontSee('name="aksi" value="simpan_notulen"', false);
     }
 
+    public function test_assigned_minute_taker_can_read_and_edit_minutes_before_deadline(): void
+    {
+        $passwordHash = Hash::make('password-notulis');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '765432109876543210',
+            'nama' => 'Notulis Ditugaskan',
+            'jabatan' => 'Dosen',
+            'password_hash' => $passwordHash,
+        ]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Khusus Notulis',
+            'tanggal' => now()->toDateString(),
+            'mulai' => now()->subMinutes(20)->format('H:i'),
+            'selesai' => now()->addMinutes(40)->format('H:i'),
+            'moda' => 'Luring',
+            'notulis' => 'Notulis Ditugaskan',
+            'notulis_pegawai_id' => $employeeId,
+            'notulen' => 'Notulen yang dapat dibaca notulis.',
+        ]);
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+        ];
+
+        $this->withSession($session)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('Anda ditugaskan sebagai notulis rapat ini.')
+            ->assertSee('name="aksi" value="simpan_notulen"', false)
+            ->assertSee('Notulen yang dapat dibaca notulis.')
+            ->assertSee('Batas pengisian notulen:');
+        $this->withSession($session)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_notulen',
+            'notulen' => 'Notulis memperbarui notulen.',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('rapat', [
+            'id' => $meetingId,
+            'notulen' => 'Notulis memperbarui notulen.',
+        ]);
+    }
+
     public function test_registered_meeting_file_can_be_viewed_or_downloaded(): void
     {
         \Illuminate\Support\Facades\Storage::fake('meeting_uploads');
@@ -2527,6 +2643,7 @@ class PortalTest extends TestCase
         $this->withSession(['admin_id' => 1])->get('/admin/rapat?edit=0')
             ->assertOk()
             ->assertSee('Notulen diisi melalui halaman detail saat rapat berlangsung atau setelah rapat selesai.')
+            ->assertSee('name="batas_notulen_hari"', false)
             ->assertSee('Pilih akun pegawai')
             ->assertSee('meeting-chair-picker-search')
             ->assertSee('meeting-minute-taker-picker-search')
@@ -2543,10 +2660,12 @@ class PortalTest extends TestCase
             'selesai' => '10:00',
             'moda' => 'Luring',
             'semua_pegawai' => '1',
+            'batas_notulen_hari' => '3',
         ])->assertRedirect('/admin/rapat');
 
         $meetingId = DB::table('rapat')->where('judul', 'Rapat Semua Pegawai')->value('id');
         $this->assertNotNull($meetingId);
+        $this->assertSame(3, (int) DB::table('rapat')->where('id', $meetingId)->value('batas_notulen_hari'));
         $this->assertSame(0, DB::table('meeting_participants')->where('rapat_id', $meetingId)->count());
 
         $this->withSession(['admin_id' => 1])->get('/admin/rapat?edit='.$meetingId)
@@ -2612,6 +2731,145 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('Pegawai Super Admin Tes')
             ->assertSee('Akses penuh');
+    }
+
+    public function test_super_admin_can_set_default_and_per_meeting_minutes_deadline(): void
+    {
+        $session = $this->superAdminSession();
+        $this->withSession($session)->get('/admin/pengaturan')
+            ->assertOk()
+            ->assertSee('Batas pengisian dan pengubahan notulen')
+            ->assertSee('value="7"', false);
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'simpan_pengaturan',
+            'batas_notulen_default_hari' => '14',
+        ])->assertRedirect('/admin/pengaturan');
+        $this->assertDatabaseHas('pengaturan', [
+            'kunci' => 'batas_notulen_default_hari',
+            'nilai' => '14',
+        ]);
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'simpan_rapat',
+            'judul' => 'Rapat Batas Notulen',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+            'semua_pegawai' => '1',
+            'batas_notulen_hari' => '4',
+        ])->assertRedirect('/admin/rapat');
+
+        $meetingId = DB::table('rapat')->where('judul', 'Rapat Batas Notulen')->value('id');
+        $this->assertSame(4, (int) DB::table('rapat')->where('id', $meetingId)->value('batas_notulen_hari'));
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'simpan_rapat',
+            'judul' => 'Rapat Batas Default',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '11:00',
+            'selesai' => '12:00',
+            'moda' => 'Luring',
+            'semua_pegawai' => '1',
+        ])->assertRedirect('/admin/rapat');
+        $defaultMeetingId = DB::table('rapat')->where('judul', 'Rapat Batas Default')->value('id');
+        $this->assertSame(14, (int) DB::table('rapat')->where('id', $defaultMeetingId)->value('batas_notulen_hari'));
+    }
+
+    public function test_meeting_managers_and_assigned_minute_taker_can_edit_until_deadline_but_super_admins_are_exempt(): void
+    {
+        $this->travelTo(now()->setTime(10, 0));
+        $minuteTakerId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345678',
+            'nama' => 'Notulis Rapat',
+            'jabatan' => 'Dosen',
+            'password_hash' => Hash::make('password-notulis'),
+        ]);
+        $managerId = DB::table('pegawai')->insertGetId([
+            'nip' => '123456789012345679',
+            'nama' => 'Pengelola Rapat',
+            'jabatan' => 'Koordinator',
+            'password_hash' => Hash::make('password-manager'),
+        ]);
+        DB::table('admin_pegawai')->insert(['pegawai_id' => $managerId]);
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Tenggat Notulen',
+            'tanggal' => now()->subDays(2)->toDateString(),
+            'mulai' => '08:00',
+            'selesai' => '09:00',
+            'moda' => 'Luring',
+            'notulis_pegawai_id' => $minuteTakerId,
+            'notulis' => 'Notulis Rapat',
+            'batas_notulen_hari' => 3,
+        ]);
+        $minuteTakerSession = [
+            'employee_id' => $minuteTakerId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $minuteTakerId)->value('password_hash'),
+        ];
+        $managerSession = [
+            'employee_id' => $managerId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $managerId)->value('password_hash'),
+            'active_role' => 'admin',
+        ];
+
+        $this->withSession($minuteTakerSession)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('name="aksi" value="simpan_notulen"', false)
+            ->assertSee('Batas pengisian notulen:');
+        $this->withSession($minuteTakerSession)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_notulen',
+            'notulen' => 'Notulen sebelum batas oleh Notulis.',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('rapat', ['id' => $meetingId, 'notulen' => 'Notulen sebelum batas oleh Notulis.']);
+
+        $this->withSession($managerSession)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('Batas pengisian notulen:')
+            ->assertSee('name="aksi" value="simpan_notulen"', false);
+        $this->withSession($managerSession)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_notulen',
+            'notulen' => 'Notulen sebelum batas oleh Pengelola.',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('rapat', ['id' => $meetingId, 'notulen' => 'Notulen sebelum batas oleh Pengelola.']);
+
+        DB::table('rapat')->where('id', $meetingId)->update([
+            'tanggal' => now()->subDays(5)->toDateString(),
+            'selesai' => '09:00',
+        ]);
+        $this->withSession($minuteTakerSession)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('Batas pengisian notulen telah berakhir.')
+            ->assertDontSee('name="aksi" value="simpan_notulen"', false);
+        $this->withSession($minuteTakerSession)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_notulen',
+            'notulen' => 'Notulen oleh pegawai setelah tenggat.',
+        ])->assertRedirect()
+            ->assertSessionHasErrors('notulen');
+
+        $this->withSession($managerSession)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('Batas pengisian notulen telah berakhir.')
+            ->assertDontSee('name="aksi" value="simpan_notulen"', false);
+        $this->withSession($managerSession)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_notulen',
+            'notulen' => 'Notulen diperbarui Pengelola setelah batas.',
+        ])->assertRedirect()
+            ->assertSessionHasErrors('notulen');
+        $this->assertDatabaseHas('rapat', [
+            'id' => $meetingId,
+            'notulen' => 'Notulen sebelum batas oleh Pengelola.',
+        ]);
+
+        $superAdminSession = $this->superAdminSession();
+        $this->withSession($superAdminSession)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_notulen',
+            'notulen' => 'Notulen diperbarui Super Admin setelah batas.',
+        ])->assertRedirect();
+        $this->assertDatabaseHas('rapat', [
+            'id' => $meetingId,
+            'notulen' => 'Notulen diperbarui Super Admin setelah batas.',
+        ]);
     }
 
     public function test_group_management_permission_controls_group_creation_and_deletion(): void
@@ -2836,7 +3094,7 @@ class PortalTest extends TestCase
             'buat_rapat' => true,
             'materi' => true,
             'rekaman' => true,
-            'notulen' => true,
+            'notulen' => false,
         ]);
         $meetingId = DB::table('rapat')->insertGetId([
             'judul' => 'Rapat Pengelola Ikut Hadir',
@@ -2868,7 +3126,8 @@ class PortalTest extends TestCase
             ->assertSee('Tambah rekaman')
             ->assertSee('SIMULASI PENGISIAN')
             ->assertSee('Simulasi Pengisian Notulen Rapat')
-            ->assertSee('Isi / tambah / ubah notulen');
+            ->assertSee('Isi / tambah / ubah notulen')
+            ->assertSee('meeting-detail-minutes-editor" open', false);
 
         $this->withSession($managerSession)->post('/meetings/'.$meetingId.'/actions', [
             'aksi' => 'hadir',
@@ -2904,6 +3163,18 @@ class PortalTest extends TestCase
         ]);
         $this->assertSame(
             'Notulen diperbarui oleh Pengelola Rapat.',
+            DB::table('rapat')->where('id', $meetingId)->value('notulen')
+        );
+        $this->withSession($managerSession)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee('meeting-detail-minutes-editor" open', false)
+            ->assertSee('Notulen diperbarui oleh Pengelola Rapat.');
+        $this->withSession($managerSession)->post('/meetings/'.$meetingId.'/actions', [
+            'aksi' => 'simpan_notulen',
+            'notulen' => 'Notulen diedit kembali oleh Pengelola Rapat.',
+        ])->assertRedirect();
+        $this->assertSame(
+            'Notulen diedit kembali oleh Pengelola Rapat.',
             DB::table('rapat')->where('id', $meetingId)->value('notulen')
         );
 

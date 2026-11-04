@@ -119,6 +119,24 @@ final class MeetingData
             && now()->lt(\Illuminate\Support\Carbon::parse($expires, config('app.timezone')));
     }
 
+    public static function minutesDeadline(array|object $meeting): \Illuminate\Support\Carbon
+    {
+        $endedAt = data_get($meeting, 'ended_at');
+        $meetingEnd = $endedAt
+            ? \Illuminate\Support\Carbon::parse($endedAt, config('app.timezone'))
+            : \Illuminate\Support\Carbon::parse(
+                data_get($meeting, 'tanggal').' '.data_get($meeting, 'selesai'),
+                config('app.timezone')
+            );
+
+        return $meetingEnd->addDays((int) (data_get($meeting, 'batas_notulen_hari') ?? 7));
+    }
+
+    public static function minutesEditingOpen(array|object $meeting): bool
+    {
+        return now()->lessThanOrEqualTo(self::minutesDeadline($meeting));
+    }
+
     public static function checkoutOpen(array|object $meeting): bool
     {
         $expires = data_get($meeting, 'presensi_pulang_kedaluwarsa');

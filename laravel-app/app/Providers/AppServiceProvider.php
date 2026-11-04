@@ -23,12 +23,14 @@ class AppServiceProvider extends ServiceProvider
     {
         View::composer('layouts.app', function ($view) {
             $pendingSignatureCount = 0;
+            $profileEmployee = null;
             $employeeId = session('employee_id');
             $sessionPasswordHash = session('employee_password_hash');
 
             if ($employeeId && is_string($sessionPasswordHash)) {
                 $employee = DB::table('pegawai')->where('id', $employeeId)->first();
                 if ($employee && $employee->password_hash && hash_equals($employee->password_hash, $sessionPasswordHash)) {
+                    $profileEmployee = $employee;
                     $pendingSignatureCount = DB::table('meeting_signatures as s')
                         ->where('s.pegawai_id', $employee->id)
                         ->where('s.status', 'menunggu')
@@ -36,7 +38,10 @@ class AppServiceProvider extends ServiceProvider
                 }
             }
 
-            $view->with('pendingSignatureCount', $pendingSignatureCount);
+            $view->with([
+                'pendingSignatureCount' => $pendingSignatureCount,
+                'profileEmployee' => $profileEmployee,
+            ]);
         });
     }
 }

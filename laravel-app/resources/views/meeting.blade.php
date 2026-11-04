@@ -309,8 +309,16 @@
 
 <section class="meeting-detail-section">
     <div class="meeting-detail-section-heading"><span aria-hidden="true">▧</span><div><h3>Notulen rapat</h3><p>Catatan hasil pembahasan rapat.</p></div></div>
+    @if($isAssignedMinuteTaker)
+        <p class="mu">Anda ditugaskan sebagai notulis rapat ini. Anda dapat membaca dan mengedit notulen sampai {{ $minutesDeadline->format('d-m-Y H:i') }} WITA.</p>
+    @endif
     @if($meeting->notulen)<div class="box meeting-detail-content-box meeting-detail-agenda">{{ $meeting->notulen }}</div>@endif
     @if($meeting->file_notulen)<p><a class="btn sm meeting-detail-download" href="{{ route('files.show', ['filename' => $meeting->file_notulen, 'download' => 1]) }}">Unduh PDF notulen</a></p>@endif
+    @if(($isAdmin || $isAssignedMinuteTaker) && !$isSuperAdmin && $canEditMinutes)
+        <p class="mu">Batas pengisian notulen: {{ $minutesDeadline->format('d-m-Y H:i') }} WITA.</p>
+    @elseif(($isAdmin || $isAssignedMinuteTaker) && !$isSuperAdmin && !$canEditMinutes)
+        <p class="mu">Batas pengisian notulen telah berakhir. Hubungi Pengelola Rapat atau Super Admin untuk perubahan.</p>
+    @endif
     @if($canEditMinutes)
         <div class="meeting-minutes-simulation-header">
             <span class="meeting-minutes-simulation-icon" aria-hidden="true">✎</span>
@@ -320,7 +328,7 @@
                 <p>Gunakan draf otomatis sebagai contoh, lengkapi pokok pembahasan dan tindak lanjut, lalu simpan notulen.</p>
             </div>
         </div>
-        <details class="box meeting-detail-content-box meeting-detail-minutes-editor" @if(!$meeting->notulen && !$meeting->file_notulen) open @endif>
+        <details class="box meeting-detail-content-box meeting-detail-minutes-editor" open>
             <summary><b>Isi / tambah / ubah notulen</b></summary>
             <form method="post" action="{{ route('meetings.action', $meeting->id) }}" enctype="multipart/form-data" class="mt-3">@csrf<input type="hidden" name="aksi" value="simpan_notulen">
                 <textarea id="minutes" name="notulen" rows="10">{{ $meeting->notulen }}</textarea>

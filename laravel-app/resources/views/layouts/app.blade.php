@@ -31,6 +31,16 @@
                     </span>
                 </div>
             @endif
+            @if($profileEmployee)
+                @php($profileInitials = collect(preg_split('/\s+/', trim($profileEmployee->nama)))->filter()->take(2)->map(fn ($part) => mb_substr($part, 0, 1))->implode(''))
+                <a class="profile-nav-link" href="{{ route('profile') }}" aria-label="Buka profil akun {{ $profileEmployee->nama }}" title="Profil akun {{ $profileEmployee->nama }}">
+                    @if($profileEmployee->profile_photo)
+                        <img src="{{ route('profile.photo') }}" alt="" class="profile-nav-avatar">
+                    @else
+                        <span class="profile-nav-avatar profile-nav-avatar-fallback" aria-hidden="true">{{ mb_strtolower($profileInitials) }}</span>
+                    @endif
+                </a>
+            @endif
             @if(isset($employee) && $employee)
                 <a class="btn sm" href="{{ route('signatures.index') }}">
                     Tanda tangan

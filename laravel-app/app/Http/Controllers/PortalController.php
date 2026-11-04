@@ -305,12 +305,81 @@ class PortalController extends Controller
         return $this->logout($request);
     }
 
+    public function profile()
+    {
+        $employee = $this->employee();
+        abort_unless($employee !== null, 403);
+
+        return view('profile', compact('employee'));
+    }
+
+    public function updateProfilePassword(Request $request)
+    {
+        $employee = $this->employee();
+        abort_unless($employee !== null, 403);
+
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed', 'different:current_password'],
+        ]);
+        if (!Hash::check($data['current_password'], $employee->password_hash)) {
+            return back()->withErrors(['current_password' => 'Kata sandi saat ini tidak sesuai.'])
+                ->withInput($request->except(['current_password', 'password', 'password_confirmation']));
+        }
+
+        $passwordHash = Hash::make($data['password']);
+        DB::table('pegawai')->where('id', $employee->id)->update([
+            'password_hash' => $passwordHash,
+        ]);
+        $request->session()->put('employee_password_hash', $passwordHash);
+
+        return redirect()->route('profile')->with('status', 'Kata sandi berhasil diubah.');
+    }
+
+    public function updateProfilePhoto(Request $request)
+    {
+        $employee = $this->employee();
+        abort_unless($employee !== null, 403);
+
+        $data = $request->validate([
+            'profile_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+        $filename = $this->storeUpload($data['profile_photo']);
+        DB::table('pegawai')->where('id', $employee->id)->update([
+            'profile_photo' => $filename,
+        ]);
+
+        if ($employee->profile_photo) {
+            Storage::disk('meeting_uploads')->delete($employee->profile_photo);
+        }
+
+        return redirect()->route('profile')->with('status', 'Foto profil berhasil diperbarui.');
+    }
+
+    public function profilePhoto()
+    {
+        $employee = $this->employee();
+        abort_unless($employee !== null && $employee->profile_photo, 404);
+
+        $disk = Storage::disk('meeting_uploads');
+        abort_unless($disk->exists($employee->profile_photo), 404);
+        $mimeType = $disk->mimeType($employee->profile_photo);
+        abort_unless(in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true), 404);
+
+        return response()->file($disk->path($employee->profile_photo), [
+            'Content-Type' => $mimeType,
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function createMeeting(Request $request)
     {
         $employee = $this->employee();
         abort_unless($employee !== null, 403);
         $permissions = $this->superAdminPermissions($employee);
-        abort_unless($this->isSuperAdminMode() || $permissions['buat_rapat'], 403);
+        $isSuperAdmin = $this->isSuperAdminMode();
+        abort_unless($isSuperAdmin || $permissions['buat_rapat'], 403);
 
         $data = $request->validate([
             'judul' => ['required', 'string', 'max:200'],
@@ -327,6 +396,9 @@ class PortalController extends Controller
             'notulis_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'pemateri' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string'],
+            'batas_notulen_hari' => $isSuperAdmin
+                ? ['sometimes', 'required', 'integer', 'between:1,365']
+                : ['prohibited'],
             'notulen' => ['prohibited'],
             'file_notulen' => ['prohibited'],
             'materi' => ['nullable', 'file', 'mimes:pdf,ppt,pptx,odp,doc,docx,xls,xlsx,ods,zip,jpg,jpeg,png', 'max:20480'],
@@ -394,6 +466,7 @@ class PortalController extends Controller
                 'agenda' => $data['agenda'] ?? '',
                 'link_rekaman' => $data['link_rekaman'] ?? null,
                 'materi_rapat' => $materialFilename,
+                'batas_notulen_hari' => (int) ($data['batas_notulen_hari'] ?? MeetingData::setting('batas_notulen_default_hari', '7')),
             ]);
             $this->saveMeetingParticipants($meetingId, $participantIds);
             if ($material) {
@@ -1334,9 +1407,16 @@ class PortalController extends Controller
 
             case 'simpan_pengaturan':
                 abort_unless($this->isSuperAdminMode(), 403);
+                $settings = $request->validate([
+                    'batas_notulen_default_hari' => ['required', 'integer', 'between:1,365'],
+                ]);
                 foreach (['wajib_izin'] as $key) {
                     DB::table('pengaturan')->updateOrInsert(['kunci' => $key], ['nilai' => $request->boolean($key) ? '1' : '0']);
                 }
+                DB::table('pengaturan')->updateOrInsert(
+                    ['kunci' => 'batas_notulen_default_hari'],
+                    ['nilai' => (string) $settings['batas_notulen_default_hari']]
+                );
                 return redirect()->route('admin', 'pengaturan')->with('status', 'Pengaturan disimpan.');
 
             default:
@@ -1377,6 +1457,9 @@ class PortalController extends Controller
             'notulis' => ['nullable', 'string', 'max:200'],
             'pemateri' => ['nullable', 'string', 'max:200'],
             'agenda' => ['nullable', 'string'],
+            'batas_notulen_hari' => $isSuperAdmin
+                ? ['sometimes', 'required', 'integer', 'between:1,365']
+                : ['prohibited'],
             'pimpinan_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'notulis_pegawai_id' => ['nullable', 'integer', 'exists:pegawai,id'],
             'link_rekaman' => ['nullable', 'url', 'regex:#^https://(drive|docs)\.google\.com/|^https://(www\.)?youtube\.com/|^https://youtu\.be/#i'],
@@ -1431,6 +1514,9 @@ class PortalController extends Controller
             'notulis_pegawai_id' => $minuteTakerId,
             'pemateri' => $data['pemateri'] ?? '',
             'agenda' => $data['agenda'] ?? '',
+            'batas_notulen_hari' => $isSuperAdmin
+                ? (int) ($data['batas_notulen_hari'] ?? $old->batas_notulen_hari ?? MeetingData::setting('batas_notulen_default_hari', '7'))
+                : (int) ($old->batas_notulen_hari ?? MeetingData::setting('batas_notulen_default_hari', '7')),
             'link_rekaman' => $canManageRecordings ? ($data['link_rekaman'] ?? null) : ($old->link_rekaman ?? null),
             'notulen' => $old->notulen ?? '',
         ];
@@ -1672,7 +1758,9 @@ class PortalController extends Controller
         $employeeSuperAdmin = (bool) ($employee && $isSuperAdmin);
         $showMeetingAdminTools = $admin && !$employee;
         $canManageMeetingContent = $admin;
-        $canEditMinutes = $canManageMeetingContent && ($isSuperAdmin || $permissions['notulen']);
+        $minutesDeadline = MeetingData::minutesDeadline($record);
+        $isAssignedMinuteTaker = $employee && (int) ($record->notulis_pegawai_id ?? 0) === (int) $employee->id;
+        $canEditMinutes = $isSuperAdmin || (($admin || $isAssignedMinuteTaker) && now()->lessThanOrEqualTo($minutesDeadline));
         $canManageMaterials = $canManageMeetingContent && ($isSuperAdmin || $permissions['materi']);
         $canManageRecordings = $canManageMeetingContent && ($isSuperAdmin || $permissions['rekaman']);
         $canViewAttendance = !$employee && ($isSuperAdmin || $permissions['lihat_daftar_hadir']);
@@ -1697,6 +1785,8 @@ class PortalController extends Controller
                 ->orderBy('waktu')
                 ->get(),
             'canEditMinutes' => $canEditMinutes,
+            'isAssignedMinuteTaker' => (bool) $isAssignedMinuteTaker,
+            'minutesDeadline' => $minutesDeadline,
             'canManageMaterials' => $canManageMaterials,
             'canManageRecordings' => $canManageRecordings,
             'canViewAttendance' => $canViewAttendance,
@@ -1753,11 +1843,13 @@ class PortalController extends Controller
         abort_unless($record !== null, 404);
         $admin = $this->isAdminMode();
         $isSuperAdmin = $this->isSuperAdminMode();
+        $isAssignedMinuteTaker = $employee && (int) ($record->notulis_pegawai_id ?? 0) === (int) $employee->id;
+        $canEditMinutes = $isSuperAdmin || (($admin || $isAssignedMinuteTaker) && MeetingData::minutesEditingOpen($record));
         $attendanceOnly = $employee && MeetingData::scheduleStatus($record) === 'berlangsung';
         $action = $request->string('aksi')->toString();
         $permissions = $this->superAdminPermissions($employee ?: null);
         $allowedActionsDuringMeeting = ['hadir', 'absen_pulang', 'simpan_alasan_pulang'];
-        if ($isSuperAdmin || $permissions['notulen']) {
+        if ($canEditMinutes) {
             $allowedActionsDuringMeeting[] = 'simpan_notulen';
         }
         if ($isSuperAdmin || $permissions['materi']) {
@@ -1918,8 +2010,12 @@ class PortalController extends Controller
         }
 
         if ($action === 'simpan_notulen') {
-            $canEdit = $isSuperAdmin || $permissions['notulen'];
-            abort_unless($canEdit, 403);
+            if (!$isSuperAdmin && ($admin || $isAssignedMinuteTaker) && !MeetingData::minutesEditingOpen($record)) {
+                return back()->withErrors([
+                    'notulen' => 'Batas waktu pengisian notulen telah berakhir. Hubungi Pengelola Rapat atau Super Admin.',
+                ]);
+            }
+            abort_unless($canEditMinutes, 403);
             $data = $request->validate([
                 'notulen' => ['nullable', 'string'],
                 'file_notulen' => ['nullable', 'file', 'mimes:pdf', 'max:15360'],

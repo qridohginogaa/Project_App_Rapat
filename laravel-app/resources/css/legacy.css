@@ -244,6 +244,42 @@ button.calendar-day {
     height: 48px
 }
 
+.profile-nav-link {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 3px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--tx);
+    text-decoration: none
+}
+
+.profile-nav-link:hover,
+.profile-nav-link:focus-visible {
+    border-color: var(--teal);
+    color: var(--teal-d)
+}
+
+.profile-nav-avatar {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover
+}
+
+.profile-nav-avatar-fallback {
+    display: grid;
+    place-items: center;
+    background: var(--teal-l);
+    color: var(--teal-d);
+    font-weight: 700
+}
+
 .bar {
     height: 4px;
     background: linear-gradient(90deg, var(--teal), var(--cyan), var(--lime))

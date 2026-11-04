@@ -13,6 +13,10 @@ Route::post('/employee/login', [PortalController::class, 'employeeLogin'])->name
 Route::get('/employee/password', [PortalController::class, 'employeePasswordForm'])->name('employee.password');
 Route::post('/employee/password', [PortalController::class, 'updateEmployeePassword'])->name('employee.password.update');
 Route::post('/employee/logout', [PortalController::class, 'employeeLogout'])->name('employee.logout');
+Route::get('/profile', [PortalController::class, 'profile'])->middleware(RequireChangedEmployeePassword::class)->name('profile');
+Route::post('/profile/password', [PortalController::class, 'updateProfilePassword'])->middleware(RequireChangedEmployeePassword::class)->name('profile.password.update');
+Route::post('/profile/photo', [PortalController::class, 'updateProfilePhoto'])->middleware(RequireChangedEmployeePassword::class)->name('profile.photo.update');
+Route::get('/profile/photo', [PortalController::class, 'profilePhoto'])->middleware(RequireChangedEmployeePassword::class)->name('profile.photo');
 Route::post('/meetings', [PortalController::class, 'createMeeting'])->middleware(RequireChangedEmployeePassword::class)->name('meetings.create');
 Route::get('/guest-attendance', [PortalController::class, 'guestAttendanceForm'])->name('guest-attendance');
 Route::post('/guest-attendance', [PortalController::class, 'registerGuestAttendance'])->middleware('throttle:60,1')->name('guest-attendance.store');
