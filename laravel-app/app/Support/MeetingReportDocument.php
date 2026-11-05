@@ -16,18 +16,12 @@ final class MeetingReportDocument
         array $attendanceRows,
         array $followUps,
         array $signatures,
-        string $verificationBaseUrl,
-        bool $allSignaturesApproved
+        string $verificationBaseUrl
     ): string {
         $writer = new Writer(new ImageRenderer(new RendererStyle(180, 2), new SvgImageBackEnd()));
         foreach ($signatures as &$signature) {
             $svg = $writer->writeString($verificationBaseUrl.'/'.rawurlencode($signature->token));
             $signature->qr_code = 'data:image/svg+xml;base64,'.base64_encode($svg);
-            $signature->accepted_at_label = $signature->disetujui_pada
-                ? \Illuminate\Support\Carbon::parse($signature->disetujui_pada, config('app.timezone'))
-                    ->locale('id')
-                    ->translatedFormat('l, j F Y H:i').' WITA'
-                : null;
         }
         unset($signature);
 
@@ -42,7 +36,6 @@ final class MeetingReportDocument
             'attendanceRows' => $attendanceRows,
             'followUps' => $followUps,
             'signatures' => $signatures,
-            'allSignaturesApproved' => $allSignaturesApproved,
         ])->render(), 'UTF-8');
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();

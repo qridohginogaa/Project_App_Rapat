@@ -998,6 +998,7 @@ class PortalTest extends TestCase
             'nip' => '333333333333333333',
             'nama' => 'Pegawai Dokumen',
             'jabatan' => 'Dosen',
+            'password_hash' => Hash::make('password-pegawai'),
         ]);
         DB::table('kehadiran')->insert([
             'rapat_id' => $meetingId,
@@ -1039,6 +1040,36 @@ class PortalTest extends TestCase
         $legacyRoute = route('meetings.report.export', $meetingId);
         $this->get($route)->assertForbidden();
         $this->get($legacyRoute)->assertForbidden();
+        $employeeSession = [
+            'employee_id' => $attendeeId,
+            'employee_password_hash' => DB::table('pegawai')->where('id', $attendeeId)->value('password_hash'),
+            'active_role' => 'pegawai',
+        ];
+        $this->withSession($employeeSession)->get('/meetings/'.$meetingId)
+            ->assertOk()
+            ->assertSee($route)
+            ->assertSee('Unduh PDF Notulen + Daftar Hadir');
+        $employeeDownload = $this->withSession($employeeSession)->get($route);
+        $employeeDownload->assertOk()
+            ->assertDownload('rapat-format-contoh-notulen-daftar-hadir.pdf')
+            ->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $employeeDownload->streamedContent());
+        $reportHtml = view('documents.meeting-report', [
+            'meeting' => DB::table('rapat')->where('id', $meetingId)->first(),
+            'attendanceRows' => [],
+            'followUps' => [],
+            'signatures' => [
+                (object) ['qr_code' => 'data:image/svg+xml;base64,', 'pegawai_nama' => 'Pimpinan Tes'],
+                (object) ['qr_code' => 'data:image/svg+xml;base64,', 'pegawai_nama' => 'Notulis Tes'],
+            ],
+        ])->render();
+        $this->assertStringNotContainsString('Belum dikonfirmasi', $reportHtml);
+        $this->assertStringNotContainsString('Dokumen belum terverifikasi secara digital', $reportHtml);
+        $this->assertStringNotContainsString('Disetujui', $reportHtml);
+        $this->assertStringContainsString('Pindai QR untuk memeriksa status verifikasi tanda tangan digital', $reportHtml);
+        $this->withSession($employeeSession)->get($legacyRoute)
+            ->assertOk()
+            ->assertDownload('rapat-format-contoh-notulen-daftar-hadir.pdf');
         $this->withSession(['admin_id' => 1])->get('/admin/rapat')
             ->assertOk()
             ->assertSee($route)

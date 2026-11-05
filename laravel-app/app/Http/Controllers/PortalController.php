@@ -622,10 +622,11 @@ class PortalController extends Controller
 
     public function exportMeetingReport(int $meeting)
     {
-        abort_unless($this->isAdminMode(), 403);
         $employee = $this->employee();
+        $adminMode = $this->isAdminMode();
+        abort_unless($employee !== null || $adminMode, 403);
         $permissions = $this->superAdminPermissions($employee);
-        abort_unless($this->isSuperAdminMode() || $permissions['lihat_daftar_hadir'], 403);
+        abort_unless($employee !== null || $this->isSuperAdminMode() || $permissions['lihat_daftar_hadir'], 403);
 
         $meetingRecord = DB::table('rapat')->where('id', $meeting)->first();
         abort_unless($meetingRecord !== null, 404);
@@ -640,25 +641,14 @@ class PortalController extends Controller
             ->join('pegawai as p', 'p.id', '=', 's.pegawai_id')
             ->where('s.rapat_id', $meeting)
             ->orderByRaw("CASE s.peran WHEN 'pimpinan' THEN 0 ELSE 1 END")
-            ->get([
-                's.peran',
-                's.token',
-                's.status',
-                's.disetujui_pada',
-                's.document_hash',
-                'p.nama as pegawai_nama',
-            ]);
-        $allSignaturesApproved = $signatures->count() === 2
-            && $signatures->every(fn ($signature) => $signature->status === 'disetujui'
-                && hash_equals((string) $signature->document_hash, $documentHash));
+            ->get(['s.token', 'p.nama as pegawai_nama']);
 
         $pdf = MeetingReportDocument::render(
             $meetingRecord,
             $reportData['attendanceRows']->all(),
             $reportData['followUps']->all(),
             $signatures->all(),
-            rtrim((string) config('app.url'), '/').'/signatures/verify',
-            $allSignaturesApproved
+            rtrim((string) config('app.url'), '/').'/signatures/verify'
         );
         $filename = (Str::slug($meetingRecord->judul) ?: 'rapat').'-notulen-daftar-hadir.pdf';
 
@@ -1777,7 +1767,7 @@ class PortalController extends Controller
         $canManageMaterials = $canManageMeetingContent && ($isSuperAdmin || $permissions['materi']);
         $canManageRecordings = $canManageMeetingContent && ($isSuperAdmin || $permissions['rekaman']);
         $canViewAttendance = !$employee && ($isSuperAdmin || $permissions['lihat_daftar_hadir']);
-        $canExportMeetingReport = $admin && ($isSuperAdmin || $permissions['lihat_daftar_hadir']);
+        $canExportMeetingReport = (bool) $employee || ($admin && ($isSuperAdmin || $permissions['lihat_daftar_hadir']));
         $employeeAttendanceOnly = $employee
             && MeetingData::scheduleStatus($record) === 'berlangsung';
         $attendees = DB::table('kehadiran as k')->join('pegawai as p', 'p.id', '=', 'k.pegawai_id')
