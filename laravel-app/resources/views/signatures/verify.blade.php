@@ -4,7 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $valid ? 'Notulen Rapat Terverifikasi' : ($pending ? 'Surat Belum Terverifikasi' : 'Persetujuan Tidak Terverifikasi') }} – Poltekkes Kemenkes Manado</title>
-    @vite(['resources/css/app.css'])
+    @include('partials.theme-bootstrap')
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen antialiased">
 <main class="signature-verify-page">
@@ -13,6 +14,7 @@
             <img src="{{ asset('assets/img/logo.png') }}" alt="Logo Poltekkes Kemenkes Manado">
             <span>Poltekkes Kemenkes Manado</span>
         </header>
+        <div class="signature-verify-theme">@include('partials.theme-toggle')</div>
 
         <section class="signature-verify-card">
             <div class="signature-verify-banner {{ $valid ? 'is-valid' : ($pending ? 'is-pending' : 'is-invalid') }}">

@@ -77,6 +77,7 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('Rapat berikutnya')
             ->assertSee('>Login</a>', false)
+            ->assertSee('Aktifkan mode gelap')
             ->assertDontSee('NIP')
             ->assertDontSee('login-identifier')
             ->assertDontSee('Cari nama atau NIP')
@@ -2581,6 +2582,7 @@ class PortalTest extends TestCase
         $this->get('/live-board')
             ->assertOk()
             ->assertSee('Live Board · Semua Ruang')
+            ->assertSee('Aktifkan mode gelap')
             ->assertSee('logo-home-link')
             ->assertSee('aria-label="Kembali ke Dashboard"', false)
             ->assertSee(route('dashboard'));
@@ -3348,6 +3350,33 @@ class PortalTest extends TestCase
         ]);
     }
 
+    public function test_super_admin_can_copy_created_attendance_code_from_readonly_field(): void
+    {
+        $meetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Kode Salin',
+            'tanggal' => now()->addDay()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+        ]);
+        $session = $this->superAdminSession();
+
+        $this->withSession($session)->post('/admin/actions', [
+            'aksi' => 'atur_presensi',
+            'id' => $meetingId,
+            'opsi_presensi' => 'buat',
+            'kode' => 'HADIR42',
+            'durasi' => '30',
+        ])->assertRedirect('/admin/rapat?presensi='.$meetingId);
+
+        $this->withSession($session)->get('/admin/rapat?presensi='.$meetingId)
+            ->assertOk()
+            ->assertSee('value="HADIR42"', false)
+            ->assertSee('readonly', false)
+            ->assertSee('data-copy-attendance-code', false)
+            ->assertSee('Salin kode');
+    }
+
     public function test_meeting_manager_cannot_create_or_manage_attendance_codes(): void
     {
         $employeeId = DB::table('pegawai')->insertGetId([
@@ -3777,6 +3806,7 @@ class PortalTest extends TestCase
         $this->withSession($superAdminSession)->get('/meetings/'.$meetingId)
             ->assertOk()
             ->assertSee('Presensi rapat')
+            ->assertSee('Salin kode')
             ->assertSee('aria-label="Fitur Pengelola Rapat"', false)
             ->assertSee('Atur presensi')
             ->assertSee(route('admin', ['tab' => 'rapat', 'presensi' => $meetingId]), false)

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Dashboard Rapat' }} – Poltekkes Kemenkes Manado</title>
+    @include('partials.theme-bootstrap')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen antialiased">
@@ -47,6 +48,7 @@
                     @if(($pendingSignatureCount ?? 0) > 0)<span class="signature-nav-count">{{ $pendingSignatureCount }}</span>@endif
                 </a>
             @endif
+            @include('partials.theme-toggle')
             <form method="post" action="{{ route('logout') }}">@csrf<button class="btn">Keluar</button></form>
         @else
             <nav class="top-guest-actions" aria-label="Akses publik">
@@ -60,6 +62,7 @@
                     </a>
                 @endif
                 <a class="btn" href="{{ route('login') }}">Login</a>
+                @include('partials.theme-toggle')
             </nav>
         @endif
     </div>

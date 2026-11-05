@@ -676,7 +676,12 @@
                 @else
                     <h3>Absen masuk</h3>
                     @if(\App\Support\MeetingData::attendanceOpen($attendanceMeeting))
-                        <p>Kode aktif <b>{{ $attendanceMeeting->kode_presensi }}</b>, berlaku sampai {{ substr($attendanceMeeting->presensi_kedaluwarsa, 11, 5) }} WITA.</p>
+                        <p>Kode aktif, berlaku sampai {{ substr($attendanceMeeting->presensi_kedaluwarsa, 11, 5) }} WITA.</p>
+                        <div class="attendance-code-copy" data-attendance-code-copy>
+                            <input type="text" value="{{ $attendanceMeeting->kode_presensi }}" readonly aria-label="Kode presensi aktif">
+                            <button class="btn sm" type="button" data-copy-attendance-code>Salin kode</button>
+                            <span role="status" aria-live="polite" data-copy-attendance-status></span>
+                        </div>
                         <div class="flex flex-wrap gap-2">
                             @foreach([15,30] as $minutes)<form method="post" action="{{ route('admin.action') }}">@csrf<input type="hidden" name="aksi" value="atur_presensi"><input type="hidden" name="id" value="{{ $attendanceMeeting->id }}"><input type="hidden" name="opsi_presensi" value="tambah_waktu"><input type="hidden" name="menit" value="{{ $minutes }}"><button class="btn sm ok">+ {{ $minutes }} menit</button></form>@endforeach
                             <form method="post" action="{{ route('admin.action') }}">@csrf<input type="hidden" name="aksi" value="atur_presensi"><input type="hidden" name="id" value="{{ $attendanceMeeting->id }}"><input type="hidden" name="opsi_presensi" value="tutup"><button class="btn sm red">Tutup presensi</button></form>
@@ -691,7 +696,12 @@
                 <hr class="my-4">
                 <h3>Absen pulang</h3>
                 @if(\App\Support\MeetingData::checkoutOpen($attendanceMeeting))
-                    <p>Kode absen pulang aktif <b>{{ $attendanceMeeting->kode_presensi_pulang }}</b>, berlaku sampai {{ substr($attendanceMeeting->presensi_pulang_kedaluwarsa, 11, 5) }} WITA.</p>
+                    <p>Kode absen pulang aktif, berlaku sampai {{ substr($attendanceMeeting->presensi_pulang_kedaluwarsa, 11, 5) }} WITA.</p>
+                    <div class="attendance-code-copy" data-attendance-code-copy>
+                        <input type="text" value="{{ $attendanceMeeting->kode_presensi_pulang }}" readonly aria-label="Kode absen pulang aktif">
+                        <button class="btn sm" type="button" data-copy-attendance-code>Salin kode</button>
+                        <span role="status" aria-live="polite" data-copy-attendance-status></span>
+                    </div>
                     <form method="post" action="{{ route('admin.action') }}">@csrf<input type="hidden" name="aksi" value="atur_presensi"><input type="hidden" name="id" value="{{ $attendanceMeeting->id }}"><input type="hidden" name="opsi_presensi" value="tutup_pulang"><button class="btn sm red">Tutup kode absen pulang</button></form>
                 @elseif($attendanceMeeting->kode_presensi_pulang)
                     <p class="mu">Kode absen pulang sebelumnya sudah berakhir.</p>

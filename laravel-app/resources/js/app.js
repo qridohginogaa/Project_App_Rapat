@@ -1,5 +1,59 @@
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+const themeToggle = document.querySelector('[data-theme-toggle]');
+
+if (themeToggle) {
+    const themeLabel = themeToggle.querySelector('[data-theme-label]');
+    const themeIcon = themeToggle.querySelector('[data-theme-icon]');
+
+    const applyTheme = (theme) => {
+        const isDark = theme === 'dark';
+        document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+        themeToggle.setAttribute('aria-pressed', String(isDark));
+        themeToggle.setAttribute('aria-label', isDark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap');
+        themeLabel.textContent = isDark ? 'Terang' : 'Gelap';
+        themeIcon.textContent = isDark ? '☀' : '☾';
+
+        try {
+            localStorage.setItem('rapat-poltekkes-theme', isDark ? 'dark' : 'light');
+        } catch {
+            themeToggle.setAttribute('title', 'Preferensi tema hanya berlaku selama halaman ini terbuka.');
+        }
+    };
+
+    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+    themeToggle.addEventListener('click', () => {
+        applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    });
+}
+
+document.querySelectorAll('[data-copy-attendance-code]').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const container = button.closest('[data-attendance-code-copy]');
+        const input = container?.querySelector('input');
+        const status = container?.querySelector('[data-copy-attendance-status]');
+
+        if (!input || !status) return;
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(input.value);
+            } else {
+                input.focus();
+                input.select();
+                if (!document.execCommand('copy')) {
+                    throw new Error('Penyalinan tidak didukung browser.');
+                }
+            }
+            status.textContent = 'Kode berhasil disalin.';
+        } catch {
+            input.focus();
+            input.select();
+            status.textContent = 'Kode belum tersalin. Salin teks yang sudah dipilih.';
+        }
+    });
+});
+
 document.querySelectorAll('[data-signer-picker]').forEach((picker) => {
     const trigger = picker.querySelector('[data-signer-trigger]');
     const menu = picker.querySelector('[data-signer-menu]');

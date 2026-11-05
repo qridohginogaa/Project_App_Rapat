@@ -5355,3 +5355,796 @@ table {
     color: #617283;
     text-align: center;
 }
+
+.theme-toggle {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    padding: .4rem .8rem;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    font-size: .85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.theme-toggle:hover {
+    border-color: #94a3b8;
+    background: #f1f5f9;
+}
+
+.theme-toggle:focus-visible {
+    outline: 3px solid rgb(8 183 162 / 40%);
+    outline-offset: 2px;
+}
+
+.theme-toggle-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.signature-verify-theme {
+    display: flex;
+    justify-content: flex-end;
+    margin: -1rem 0 1rem;
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+    --teal-d: #5ee4d0;
+    --teal-l: #123b3b;
+    --lime-l: #35391f;
+    --tx: #e2e8f0;
+    --mu: #a4b1c2;
+    --bd: #334155;
+    background: #0b1220;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] body:not(.live-board-page) {
+    background:
+        radial-gradient(ellipse at 8% 8%, rgb(8 183 162 / 9%), transparent 34rem),
+        radial-gradient(ellipse at 90% 18%, rgb(0 186 203 / 6%), transparent 30rem),
+        linear-gradient(145deg, #0b1220 0%, #111a2a 52%, #111827 100%);
+    color: var(--tx);
+}
+
+html[data-theme="dark"] body.live-board-page {
+    background: #0b1220;
+    color: var(--tx);
+}
+
+html[data-theme="dark"] :is(h1, h2, h3, h4, p, label, th, td, dt, dd) {
+    color: inherit;
+}
+
+html[data-theme="dark"] a {
+    color: #7ce8da;
+}
+
+html[data-theme="dark"] .top,
+html[data-theme="dark"] .admin-menu,
+html[data-theme="dark"] .live-board-header {
+    border-color: #263449;
+    background: rgb(15 23 42 / 92%);
+    color: var(--tx);
+}
+
+html[data-theme="dark"] .top h1,
+html[data-theme="dark"] .dashboard-hero p,
+html[data-theme="dark"] .calendar-time,
+html[data-theme="dark"] .signature-verify-back {
+    color: #7ce8da;
+}
+
+html[data-theme="dark"] :is(.mu, .admin-meeting-heading h2, .admin-meeting-heading p, .admin-meeting-stat-copy small, .admin-meeting-card-title-row h3, .admin-meeting-card-meta > span, .admin-meeting-card-meta > span b) {
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .tabs.admin-menu-panel {
+    border-color: #334155;
+    background: linear-gradient(110deg, #172235, #1b2931 58%, #292d21);
+}
+
+html[data-theme="dark"] .tabs.admin-menu-panel a,
+html[data-theme="dark"] .tabs.admin-menu-panel a:hover {
+    color: #dbeafe;
+}
+
+html[data-theme="dark"] .tabs.admin-menu-panel a:hover {
+    border-color: #2dd4bf;
+    background: #174e4a;
+}
+
+html[data-theme="dark"] .tabs.admin-menu-panel a.on,
+html[data-theme="dark"] .tabs.admin-menu-panel a.on:hover,
+html[data-theme="dark"] .tabs.admin-menu-panel a:active {
+    border-color: #0f766e;
+    background: #0f766e;
+    color: #fff;
+}
+
+html[data-theme="dark"] :is(
+    .stat, .box, .mt, .dashboard-hero, .upcoming-slider, .meeting-create-panel,
+    .meeting-create-summary, .meeting-form-section, .calendar-clock, .calendar-grid,
+    .live-board-card, .meeting-detail-section, .meeting-detail-hero, .meeting-card,
+    .admin-meeting-heading, .admin-meeting-stat, .admin-meeting-toolbar, .admin-meeting-card,
+    .admin-meeting-empty, .signature-request-card,
+    .signature-inbox-empty, .signature-verify-card, .profile-card, .profile-section,
+    .participant-group, .participant-card, .meeting-participant-list, .meeting-form-card
+) {
+    border-color: #334155;
+    background: linear-gradient(135deg, rgb(30 41 59 / 96%), rgb(17 33 47 / 96%));
+    color: var(--tx);
+    box-shadow: 0 10px 28px rgb(0 0 0 / 22%);
+}
+
+html[data-theme="dark"] :is(.mt.hari, .calendar-day.has-events, .calendar-clock) {
+    background: #183b3b;
+}
+
+html[data-theme="dark"] :is(.mt.selesai) {
+    background: #202b3b;
+}
+
+html[data-theme="dark"] .admin-meeting-heading {
+    background: linear-gradient(120deg, #1e293b, #15333a 72%, #283323);
+}
+
+html[data-theme="dark"] .admin-meeting-toolbar {
+    background: #172235;
+}
+
+html[data-theme="dark"] .admin-meeting-filters {
+    border-color: #475569;
+    background: #111c2d;
+}
+
+html[data-theme="dark"] .admin-meeting-filters button {
+    color: #cbd5e1;
+}
+
+html[data-theme="dark"] .admin-meeting-filters button > span {
+    background: #334155;
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .admin-meeting-filters button:hover,
+html[data-theme="dark"] .admin-meeting-filters button.is-active {
+    border-color: #2dd4bf;
+    background: #174e4a;
+    color: #ccfbf1;
+}
+
+html[data-theme="dark"] .admin-meeting-filters button.is-active > span {
+    background: #0f766e;
+    color: #fff;
+}
+
+html[data-theme="dark"] .admin-meeting-status {
+    border-color: #6b5b20;
+    background: #3b321c;
+    color: #fde68a;
+}
+
+html[data-theme="dark"] .admin-meeting-status-berlangsung {
+    border-color: #155e75;
+    background: #123849;
+    color: #a5f3fc;
+}
+
+html[data-theme="dark"] .admin-meeting-status-selesai {
+    border-color: #475569;
+    background: #273449;
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .admin-meeting-status-dibatalkan,
+html[data-theme="dark"] .tag.dibatalkan {
+    border-color: #7f1d35;
+    background: #3b1725;
+    color: #fda4af;
+}
+
+html[data-theme="dark"] .admin-meeting-card-actions {
+    border-color: #334155;
+}
+
+html[data-theme="dark"] .admin-meeting-date-icon {
+    border-color: #155e59;
+    background: #174e4a;
+    color: #99f6e4;
+    box-shadow: none;
+}
+
+html[data-theme="dark"] .admin-meeting-card-actions .admin-meeting-attendance {
+    border-color: #155e59;
+    background: #174e4a;
+    color: #99f6e4;
+}
+
+html[data-theme="dark"] .admin-meeting-card-actions .red {
+    border-color: #7f1d35;
+    background: #3b1725;
+    color: #fda4af;
+}
+
+html[data-theme="dark"] :is(.calendar-day, .calendar-weekday) {
+    color: var(--tx);
+}
+
+html[data-theme="dark"] :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .signer-picker-trigger, .signer-picker-menu, .signer-picker-search) {
+    border-color: #475569;
+    background-color: #111c2d;
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] :is(input, select, textarea)::placeholder {
+    color: #94a3b8;
+}
+
+html[data-theme="dark"] :is(.signer-picker-option:hover, .signer-picker-option.is-active) {
+    background: #183b3b;
+    color: #9af0e4;
+}
+
+html[data-theme="dark"] :is(table, thead, tbody, tr, th, td) {
+    border-color: #334155;
+}
+
+html[data-theme="dark"] th {
+    background-color: #1e293b;
+}
+
+html[data-theme="dark"] tr:nth-child(even) {
+    background-color: rgb(30 41 59 / 45%);
+}
+
+html[data-theme="dark"] :is(.btn, button:not(.theme-toggle), .top-guest-attendance) {
+    border-color: #475569;
+}
+
+html[data-theme="dark"] .btn {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .btn.pri {
+    border-color: #087f72;
+    background: #087f72;
+    color: #fff;
+}
+
+html[data-theme="dark"] .btn.red {
+    border-color: #7f1d35;
+    background: #3b1725;
+    color: #fda4af;
+}
+
+html[data-theme="dark"] .btn.ok {
+    border-color: #166534;
+    background: #153322;
+    color: #86efac;
+}
+
+html[data-theme="dark"] .theme-toggle {
+    border-color: #475569;
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .theme-toggle:hover {
+    background: #334155;
+}
+
+html[data-theme="dark"] .logo {
+    border-color: #3b4b62;
+    background: #111c2d;
+    box-shadow: none;
+}
+
+html[data-theme="dark"] :is(.signature-verify-detail, .signature-verify-disclaimer) {
+    border-color: #334155;
+}
+
+html[data-theme="dark"] :is(.signature-verify-brand, .signature-verify-detail > strong, .signature-verify-code > strong) {
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] .signature-verify-banner.is-valid {
+    background: #123b32;
+    color: #a7f3d0;
+}
+
+html[data-theme="dark"] .signature-verify-banner.is-pending {
+    background: #3b321c;
+    color: #fde68a;
+}
+
+html[data-theme="dark"] .signature-verify-banner.is-invalid {
+    background: #3b281f;
+    color: #fdba74;
+}
+
+html[data-theme="dark"] body :is(
+    .invite-group-hero, .invite-group-create, .invite-group-overview > div,
+    .invite-group-card, .invite-group-total, .employee-page-intro,
+    .employee-password-notice, .employee-add-panel, .employee-add-form,
+    .employee-table-wrap, .attendance-meeting-card, .signature-request-card,
+    .signature-inbox-empty, .meeting-create-summary, .meeting-create-content,
+    .profile-card, .profile-section, .guest-attendance-card, .login-card
+) {
+    border-color: #334155;
+    background: #1e293b;
+    color: #e2e8f0;
+    box-shadow: 0 10px 28px rgb(0 0 0 / 22%);
+}
+
+html[data-theme="dark"] body :is(
+    [class*="-card"], [class*="-panel"], [class*="-hero"], [class*="-section"],
+    [class*="-toolbar"], [class*="-notice"], [class*="-table-wrap"], [class*="-empty"]
+) {
+    border-color: #334155;
+}
+
+html[data-theme="dark"] body :is(
+    h1, h2, h3, h4, h5, h6, p, span, b, strong, small, label, legend,
+    th, td, li, summary, dt, dd
+) {
+    color: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] body :is(.mu, .invite-group-eyebrow, .employee-page-intro > span, .invite-group-overview b, .invite-group-card-copy p b) {
+    color: #7ce8da !important;
+}
+
+html[data-theme="dark"] body :is(input, select, textarea) {
+    border-color: #475569 !important;
+    background-color: #111c2d !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body :is(input, select, textarea)::placeholder {
+    color: #a4b1c2 !important;
+}
+
+html[data-theme="dark"] body :is(button, .btn) {
+    color: #f1f5f9;
+}
+
+html[data-theme="dark"] body :is(.btn.pri, .admin-meeting-add, .invite-group-create-fields .btn) {
+    color: #fff;
+}
+
+html[data-theme="dark"] body :is(.invite-group-delete, .btn.red) {
+    border-color: #7f1d35;
+    background: #3b1725;
+    color: #fda4af !important;
+}
+
+html[data-theme="dark"] body :is(.invite-group-card-icon, .invite-group-create-icon, .employee-add-icon) {
+    border-color: #155e59;
+    background: #174e4a;
+    color: #99f6e4 !important;
+}
+
+html[data-theme="dark"] body :is(.invite-group-default-badge, .invite-group-total, .tag, [class*="-status"]) {
+    border-color: #475569;
+    background: #334155;
+    color: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] body .employee-table tbody tr:hover {
+    background: #263449;
+}
+
+html[data-theme="dark"] body table {
+    background: #172235;
+    color: #e2e8f0;
+}
+
+html[data-theme="dark"] body :is(.employee-add-panel > summary:hover, .invite-group-delete:hover) {
+    background: #334155;
+}
+
+html[data-theme="dark"] body .admin-role-select {
+    color: #99f6e4 !important;
+}
+
+html[data-theme="dark"] body .participant-picker,
+html[data-theme="dark"] body .participant-groups,
+html[data-theme="dark"] body .participant-list {
+    border-color: #3b4b62 !important;
+    background: #172235 !important;
+    color: #e8eef7 !important;
+}
+
+html[data-theme="dark"] body .participant-all-toggle,
+html[data-theme="dark"] body .participant-group,
+html[data-theme="dark"] body .participant-row {
+    border-color: #475569 !important;
+    background: #1b2739 !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .participant-all-toggle:has(input:checked),
+html[data-theme="dark"] body .participant-row:has(input:checked) {
+    border-color: #2dd4bf !important;
+    background: #173c42 !important;
+}
+
+html[data-theme="dark"] body .participant-all-toggle-copy strong,
+html[data-theme="dark"] body .participant-picker-heading h4,
+html[data-theme="dark"] body .participant-group > summary,
+html[data-theme="dark"] body .participant-row-copy strong {
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .participant-all-toggle-copy small,
+html[data-theme="dark"] body .participant-picker-heading p,
+html[data-theme="dark"] body .participant-row-copy small {
+    color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] body :is(.participant-group-count, .participant-group-selected, .participant-all-toggle-badge, .participant-selection-count) {
+    border: 1px solid #475569 !important;
+    background: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .participant-group-selected,
+html[data-theme="dark"] body .participant-all-toggle:has(input:checked) .participant-all-toggle-badge {
+    border-color: #236d69 !important;
+    background: #174e4a !important;
+    color: #a7f3e8 !important;
+}
+
+html[data-theme="dark"] body .participant-group-chevron {
+    background: #174e4a !important;
+    color: #a7f3e8 !important;
+}
+
+html[data-theme="dark"] body .participant-group-actions .btn {
+    border-color: #475569 !important;
+    background: #26364c !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .participant-group-actions .btn:disabled {
+    color: #cbd5e1 !important;
+    opacity: .65;
+}
+
+html[data-theme="dark"] body .participant-row:hover {
+    border-color: #2dd4bf !important;
+    background: #20364a !important;
+}
+
+html[data-theme="dark"] body .mt .jam,
+html[data-theme="dark"] body .upcoming-slide .meeting-card-main .jam,
+html[data-theme="dark"] body .completed-meeting-card .meeting-card-main .jam {
+    border: 1px solid #53657d !important;
+    background: #26364c !important;
+    color: #ffffff !important;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
+}
+
+html[data-theme="dark"] body .mt .jam small,
+html[data-theme="dark"] body .upcoming-slide .meeting-card-main .jam small,
+html[data-theme="dark"] body .completed-meeting-card .meeting-card-main .jam small {
+    color: #dbeafe !important;
+    font-weight: 600;
+}
+
+html[data-theme="dark"] body :is(
+    .box, .stat, .mt, .dashboard-hero, .dashboard-empty, .upcoming-slider,
+    .completed-meeting-card, .meeting-create-link, .meeting-create-panel,
+    .meeting-create-summary, .meeting-create-content, .meeting-create-note,
+    .meeting-form-section, .employee-page-intro, .employee-password-notice,
+    .employee-add-panel, .employee-add-form, .employee-table-wrap,
+    .invite-group-hero, .invite-group-overview > div, .invite-group-create,
+    .invite-group-card, .invite-group-total, .attendance-intro, .attendance-stat,
+    .attendance-section, .attendance-meeting-card, .attendance-meeting-content,
+    .attendance-leave-toolbar, .attendance-leave-search, .attendance-leave-card,
+    .attendance-leave-meeting, .attendance-filter-empty, .attendance-empty,
+    .admin-meeting-heading, .admin-meeting-stat, .admin-meeting-toolbar,
+    .admin-meeting-filters, .admin-meeting-card, .admin-meeting-empty,
+    .meeting-detail-hero, .meeting-detail-info-card, .meeting-detail-section,
+    .meeting-detail-content-box, .meeting-participants-disclosure,
+    .meeting-detail-all-employees, .meeting-detail-empty, .meeting-attendance-panel,
+    .meeting-attendance-state, .meeting-attendance-reason, .guest-attendance-hero,
+    .guest-attendance-steps, .guest-attendance-form, .guest-attendance-help,
+    .guest-attendance-notice, .guest-attendance-code-box, .guest-attendance-closed,
+    .signature-request-card, .signature-inbox-empty, .signature-verify-card,
+    .profile-card, .profile-section, .calendar-clock, .live-board-card,
+    .live-board-empty, .participant-group, .participant-card, .meeting-form-card,
+    [class*="-card"], [class*="-panel"], [class*="-hero"], [class*="-section"],
+    [class*="-toolbar"], [class*="-notice"], [class*="-empty"], [class*="-table-wrap"],
+    [class*="-content-box"]
+) {
+    border-color: #3b4b62 !important;
+    background: #1b2739 !important;
+    color: #e8eef7 !important;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+html[data-theme="dark"] body :is(
+    .tabs, .admin-menu, .admin-menu-panel, .admin-meeting-filters,
+    .attendance-leave-filters, .employee-search, .employee-list-heading,
+    .signature-inbox-heading, .meeting-detail-participants > li,
+    .meeting-create-fields, .meeting-form-grid, .meeting-create-intro,
+    .meeting-detail-section-heading, .attendance-section-heading
+) {
+    border-color: #3b4b62 !important;
+    background: #172235 !important;
+    color: #e8eef7 !important;
+}
+
+html[data-theme="dark"] body :is(.employee-table, .employee-table thead, .employee-table tbody, .employee-table tr, table, thead, tbody, tr) {
+    border-color: #3b4b62 !important;
+    background: #172235 !important;
+    color: #e8eef7 !important;
+}
+
+html[data-theme="dark"] body :is(th, .employee-table th, .attendance-meeting-table th, .admin-meeting-table thead th) {
+    border-color: #3b4b62 !important;
+    background: #26364c !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body :is(td, .employee-table td, .attendance-meeting-table td, .admin-meeting-table td) {
+    border-color: #334155 !important;
+    background-color: #172235 !important;
+    color: #e8eef7 !important;
+}
+
+html[data-theme="dark"] body :is(
+    .employee-search > span, .invite-group-card-icon, .invite-group-create-icon,
+    .employee-add-icon, .attendance-meeting-icon, .attendance-leave-avatar,
+    .meeting-detail-info-icon, .meeting-detail-section-heading > span,
+    .meeting-attendance-panel-icon, .signature-request-icon,
+    .meeting-participant-number, .admin-meeting-date-icon
+) {
+    border-color: #236d69 !important;
+    background: #174e4a !important;
+    color: #a7f3e8 !important;
+}
+
+html[data-theme="dark"] body :is(.meeting-detail-status, .meeting-attendance-state .tag, .attendance-meeting-counts .tag) {
+    border-color: #475569 !important;
+    background: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body :is(.tag.akan, .tag.berlangsung, .meeting-detail-status-berlangsung) {
+    border-color: #155e75 !important;
+    background: #123849 !important;
+    color: #a5f3fc !important;
+}
+
+html[data-theme="dark"] body :is(.tag.hadir, .tag.disetujui, .signature-approved-status) {
+    border-color: #166534 !important;
+    background: #153322 !important;
+    color: #86efac !important;
+}
+
+html[data-theme="dark"] body :is(.tag.izin, .tag.hari, .tag.pending, .signature-pending-status) {
+    border-color: #6b5b20 !important;
+    background: #3b321c !important;
+    color: #fde68a !important;
+}
+
+html[data-theme="dark"] body :is(.tag.selesai, .tag.kosong, .tag.ditolak) {
+    border-color: #475569 !important;
+    background: #334155 !important;
+    color: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] body :is(.tag.dibatalkan, .tag.red, .btn.red, .invite-group-delete) {
+    border-color: #7f1d35 !important;
+    background: #3b1725 !important;
+    color: #fda4af !important;
+}
+
+html[data-theme="dark"] body :is(
+    .admin-meeting-filters button, .attendance-leave-filters button,
+    .tabs.admin-menu-panel a, .meeting-participants-disclosure > summary
+) {
+    border-color: #475569 !important;
+    background: #26364c !important;
+    color: #e8eef7 !important;
+}
+
+html[data-theme="dark"] body :is(
+    .admin-meeting-filters button.is-active, .attendance-leave-filters button.is-active,
+    .tabs.admin-menu-panel a.on
+) {
+    border-color: #0f766e !important;
+    background: #0f766e !important;
+    color: #fff !important;
+}
+
+html[data-theme="dark"] body :is(.admin-meeting-card-actions, .attendance-leave-actions, .signature-request-action) {
+    border-color: #3b4b62 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details > .admin-meeting-details {
+    border-color: #53657d !important;
+    background: #1b2739 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details > .admin-meeting-details > summary {
+    background: #26364c !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details > .admin-meeting-details[open] > summary {
+    border-bottom-color: #53657d !important;
+    background: #203b4c !important;
+    color: #ccfbf1 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details > .admin-meeting-details > summary > span {
+    border: 1px solid #53657d !important;
+    background: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details .tw {
+    border-color: #475569 !important;
+    background: #172235 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details .tw table,
+html[data-theme="dark"] body .admin-meeting-attendance-details .tw tbody,
+html[data-theme="dark"] body .admin-meeting-attendance-details .tw tr,
+html[data-theme="dark"] body .admin-meeting-attendance-details .tw td {
+    background: #172235 !important;
+    color: #e8eef7 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details .tw th {
+    background: #26364c !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details .tag {
+    border: 1px solid #53657d !important;
+    background: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details .tag.hadir {
+    border-color: #166534 !important;
+    background: #153322 !important;
+    color: #86efac !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-attendance-details .tag.akan {
+    border-color: #155e75 !important;
+    background: #123849 !important;
+    color: #a5f3fc !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-stat-icon {
+    border-color: #2dd4bf !important;
+    background: #115e59 !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-stat-upcoming .admin-meeting-stat-icon {
+    border-color: #facc15 !important;
+    background: #713f12 !important;
+    color: #fef08a !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-stat-ongoing .admin-meeting-stat-icon {
+    border-color: #22d3ee !important;
+    background: #164e63 !important;
+    color: #cffafe !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-stat-completed .admin-meeting-stat-icon {
+    border-color: #94a3b8 !important;
+    background: #334155 !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-stat-copy small {
+    color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-stat-copy b {
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-filters button {
+    border-color: #53657d !important;
+    background: #26364c !important;
+    color: #f1f5f9 !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-filters button > span {
+    border: 1px solid #64748b !important;
+    background: #0f172a !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-filters button:hover {
+    border-color: #2dd4bf !important;
+    background: #174e4a !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] body .admin-meeting-filters button.is-active,
+html[data-theme="dark"] body .admin-meeting-filters button.is-active > span {
+    border-color: #2dd4bf !important;
+    background: #0f766e !important;
+    color: #ffffff !important;
+}
+
+.attendance-code-copy {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.attendance-code-copy input {
+    width: min(100%, 480px);
+    min-height: 50px;
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: .15em;
+}
+
+.attendance-code-copy [data-copy-attendance-status] {
+    color: #087a51;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+html[data-theme="dark"] body .attendance-code-copy input {
+    border-color: #64748b !important;
+    background: #0f172a !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] body .attendance-code-copy [data-copy-attendance-status] {
+    color: #86efac !important;
+}
+
+html[data-theme="dark"] body :is(.signature-verify-banner.is-valid) {
+    background: #123b32 !important;
+    color: #a7f3d0 !important;
+}
+
+html[data-theme="dark"] body :is(.signature-verify-banner.is-pending) {
+    background: #3b321c !important;
+    color: #fde68a !important;
+}
+
+html[data-theme="dark"] body :is(.signature-verify-banner.is-invalid) {
+    background: #3b281f !important;
+    color: #fdba74 !important;
+}
+
+html[data-theme="dark"] body :is(.signature-verify-banner, .signature-verify-banner *) {
+    border-color: #475569 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-toggle {
+        transition: none;
+    }
+}

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
     <title>Live Board{{ $selectedRoom ? ' '.$selectedRoom->nama : ' Semua Ruang' }} – Poltekkes Kemenkes Manado</title>
+    @include('partials.theme-bootstrap')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="live-board-page{{ $selectedRoom ? ' live-board-room' : '' }}">
@@ -21,6 +22,7 @@
         </div>
         <div class="live-board-actions">
             <time id="live-board-clock">--:--:-- WITA</time>
+            @include('partials.theme-toggle')
             <button id="live-board-fullscreen" class="btn sm" type="button" aria-label="Tampilkan layar penuh">Tampilkan layar penuh</button>
         </div>
     </header>
