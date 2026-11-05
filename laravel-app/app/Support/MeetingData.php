@@ -29,6 +29,63 @@ final class MeetingData
         return data_get($meeting, 'started_at') ? 'berlangsung' : 'akan';
     }
 
+    public static function markCancelledSignatureNotificationsSeen(int $employeeId): void
+    {
+        $today = now()->toDateString();
+        $signatureIds = DB::table('meeting_signatures as s')
+            ->join('rapat as r', 'r.id', '=', 's.rapat_id')
+            ->where('s.pegawai_id', $employeeId)
+            ->where('s.status', 'menunggu')
+            ->whereNull('s.notification_seen_at')
+            ->where(function ($query) use ($today) {
+                $query->whereNotNull('r.cancelled_at')
+                    ->orWhere(function ($legacyCancellation) use ($today) {
+                        $legacyCancellation->whereDate('r.tanggal', '<', $today)
+                            ->whereNull('r.started_at')
+                            ->whereNull('r.ended_at');
+                    });
+            })
+            ->pluck('s.id');
+
+        if ($signatureIds->isNotEmpty()) {
+            DB::table('meeting_signatures')
+                ->whereIn('id', $signatureIds)
+                ->whereNull('notification_seen_at')
+                ->update(['notification_seen_at' => now()]);
+        }
+    }
+
+    public static function pendingSignatureNotificationCount(int $employeeId): int
+    {
+        $today = now()->toDateString();
+
+        return DB::table('meeting_signatures as s')
+            ->join('rapat as r', 'r.id', '=', 's.rapat_id')
+            ->where('s.pegawai_id', $employeeId)
+            ->where('s.status', 'menunggu')
+            ->where(function ($query) use ($today) {
+                $query->where(function ($activeMeeting) use ($today) {
+                    $activeMeeting->whereNull('r.cancelled_at')
+                        ->where(function ($state) use ($today) {
+                            $state->whereDate('r.tanggal', '>=', $today)
+                                ->orWhereNotNull('r.started_at')
+                                ->orWhereNotNull('r.ended_at');
+                        });
+                })->orWhere(function ($unseenCancellation) use ($today) {
+                    $unseenCancellation->whereNull('s.notification_seen_at')
+                        ->where(function ($state) use ($today) {
+                            $state->whereNotNull('r.cancelled_at')
+                                ->orWhere(function ($legacyCancellation) use ($today) {
+                                    $legacyCancellation->whereDate('r.tanggal', '<', $today)
+                                        ->whereNull('r.started_at')
+                                        ->whereNull('r.ended_at');
+                                });
+                        });
+                });
+            })
+            ->count();
+    }
+
     public static function slug(array|object $meeting): string
     {
         $date = (string) data_get($meeting, 'tanggal');

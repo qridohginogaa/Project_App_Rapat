@@ -130,6 +130,8 @@ class PortalTest extends TestCase
         $this->get(route('meetings.canonical', $meetingSlug))
             ->assertOk()
             ->assertSee('Peserta rapat')
+            ->assertSee('<details class="meeting-participants-disclosure">', false)
+            ->assertSee('Lihat daftar peserta')
             ->assertSee('Nama Peserta Tes')
             ->assertSee('Rapat dengan daftar peserta')
             ->assertSee('Agenda internal')
@@ -1242,6 +1244,81 @@ class PortalTest extends TestCase
             ->assertOk()
             ->assertSee('signature-nav-count')
             ->assertSee('>2</span>', false);
+    }
+
+    public function test_opening_signature_inbox_clears_cancelled_meeting_badges_but_keeps_pending_signatures(): void
+    {
+        $passwordHash = Hash::make('password-penanda-tangan');
+        $employeeId = DB::table('pegawai')->insertGetId([
+            'nip' => '777777777777777777',
+            'nama' => 'Pegawai Penanda Tangan',
+            'jabatan' => 'Dosen',
+            'password_hash' => $passwordHash,
+        ]);
+        $cancelledMeetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Dibatalkan',
+            'tanggal' => now()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+            'pimpinan_pegawai_id' => $employeeId,
+            'notulen' => 'Notulen rapat yang dibatalkan.',
+            'cancelled_at' => now(),
+        ]);
+        $pendingMeetingId = DB::table('rapat')->insertGetId([
+            'judul' => 'Rapat Menunggu Tanda Tangan',
+            'tanggal' => now()->toDateString(),
+            'mulai' => '09:00',
+            'selesai' => '10:00',
+            'moda' => 'Luring',
+            'pimpinan_pegawai_id' => $employeeId,
+            'notulen' => '',
+        ]);
+
+        foreach ([
+            [$cancelledMeetingId, str_repeat('c', 64)],
+            [$pendingMeetingId, str_repeat('d', 64)],
+        ] as [$meetingId, $token]) {
+            DB::table('meeting_signatures')->insert([
+                'rapat_id' => $meetingId,
+                'pegawai_id' => $employeeId,
+                'peran' => 'pimpinan',
+                'token' => $token,
+                'status' => 'menunggu',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $session = [
+            'employee_id' => $employeeId,
+            'employee_password_hash' => $passwordHash,
+            'active_role' => 'pegawai',
+        ];
+
+        $this->withSession($session)->get('/')
+            ->assertOk()
+            ->assertSee('signature-nav-count')
+            ->assertSee('>2</span>', false);
+
+        $this->withSession($session)->get(route('signatures.index'))
+            ->assertOk()
+            ->assertSee('Rapat Dibatalkan')
+            ->assertSee('Rapat dibatalkan')
+            ->assertSee('Rapat Menunggu Tanda Tangan')
+            ->assertSee('1 notifikasi menunggu');
+        $this->assertDatabaseHas('meeting_signatures', [
+            'rapat_id' => $cancelledMeetingId,
+        ]);
+        $this->assertNotNull(DB::table('meeting_signatures')
+            ->where('rapat_id', $cancelledMeetingId)
+            ->value('notification_seen_at'));
+
+        $this->withSession($session)->get('/')
+            ->assertOk()
+            ->assertSee('signature-nav-count')
+            ->assertSee('>1</span>', false)
+            ->assertDontSee('>2</span>', false);
     }
 
     public function test_employee_can_sign_in_with_their_existing_password_hash(): void
@@ -2776,6 +2853,12 @@ class PortalTest extends TestCase
             'active_role' => 'admin',
         ])->get('/admin/rapat?edit=0')
             ->assertOk()
+            ->assertSee('data-participant-picker', false)
+            ->assertSee('class="participant-picker-heading"', false)
+            ->assertSee('Rapat untuk semua pegawai')
+            ->assertSee('Pegawai yang wajib mengikuti')
+            ->assertSee('Pilih semua pegawai dalam grup')
+            ->assertSee('data-participant-search', false)
             ->assertSee('id="mulai-hour"', false)
             ->assertSee('<option value="09" selected>09</option>', false)
             ->assertSee('<option value="00" selected>00</option>', false)

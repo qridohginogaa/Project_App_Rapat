@@ -671,6 +671,7 @@ class PortalController extends Controller
     {
         $employee = $this->employee();
         abort_unless($employee !== null, 403);
+        MeetingData::markCancelledSignatureNotificationsSeen((int) $employee->id);
         $requests = DB::table('meeting_signatures as s')
             ->join('rapat as r', 'r.id', '=', 's.rapat_id')
             ->where('s.pegawai_id', $employee->id)
@@ -697,7 +698,9 @@ class PortalController extends Controller
                 'r.agenda',
                 'r.pemateri',
                 'r.notulen',
+                'r.started_at',
                 'r.ended_at',
+                'r.cancelled_at',
             ])
             ->map(function ($signature) {
                 $signature->can_sign = trim((string) $signature->notulen) !== ''
@@ -719,7 +722,7 @@ class PortalController extends Controller
         return view('signatures.index', [
             'employee' => $employee,
             'signatures' => $requests,
-            'pendingSignatureCount' => $requests->where('status', 'menunggu')->count(),
+            'pendingSignatureCount' => MeetingData::pendingSignatureNotificationCount((int) $employee->id),
         ]);
     }
 

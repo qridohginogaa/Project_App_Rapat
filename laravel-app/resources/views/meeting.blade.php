@@ -56,9 +56,18 @@
     @if($meetingParticipants->isEmpty())
         <p class="meeting-detail-all-employees">Rapat ini terbuka untuk semua pegawai.</p>
     @else
-        <div class="meeting-detail-participants">
-            @foreach($meetingParticipants as $person)<span>{{ $person->nama }}</span>@endforeach
-        </div>
+        <details class="meeting-participants-disclosure">
+            <summary>
+                <span>Lihat daftar peserta</span>
+                <span class="meeting-participants-summary-count">{{ $meetingParticipants->count() }} orang</span>
+                <span class="meeting-participants-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <ol class="meeting-detail-participants">
+                @foreach($meetingParticipants as $person)
+                    <li><span class="meeting-participant-number">{{ sprintf('%02d', $loop->iteration) }}</span><span>{{ $person->nama }}</span></li>
+                @endforeach
+            </ol>
+        </details>
     @endif
     </section>
 
