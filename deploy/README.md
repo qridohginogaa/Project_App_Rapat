@@ -7,6 +7,7 @@ Aplikasi berjalan di Docker sendiri (project compose `rapat`), terpisah dari sit
 | Container | Isi |
 | --- | --- |
 | `rapat-app-1` | PHP 8.3-FPM + kode Laravel + aset Vite hasil build |
+| `rapat-scheduler-1` | image yang sama dengan `app`, menjalankan `php artisan schedule:work` (pembatalan/pengakhiran rapat otomatis) |
 | `rapat-web-1` | nginx, terbuka hanya di `127.0.0.1:8100` |
 | `rapat-db-1` | MySQL 8.4, database `rapat_poltekkes` (volume `rapat_dbdata`) |
 

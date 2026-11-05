@@ -4,22 +4,32 @@ x-build: &build
   context: /var/www/rapat
   dockerfile: /opt/rapat-deploy/docker/Dockerfile
 
+x-app: &app
+  env_file: .env
+  volumes:
+    - storage:/var/www/html/storage
+    - /var/www/rapat/uploads:/var/www/uploads
+    - ./php.ini:/usr/local/etc/php/conf.d/99-rapat.ini:ro
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+
 services:
   app:
+    <<: *app
     build:
       <<: *build
       target: app
     image: rapat-app:prod
-    env_file: .env
     command: ["sh", "-c", "runuser -u www-data -- php artisan optimize && exec php-fpm"]
-    volumes:
-      - storage:/var/www/html/storage
-      - /var/www/rapat/uploads:/var/www/uploads
-      - ./php.ini:/usr/local/etc/php/conf.d/99-rapat.ini:ro
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+
+  # Menjalankan schedule:run tiap menit (pembatalan/pengakhiran rapat otomatis).
+  scheduler:
+    <<: *app
+    image: rapat-app:prod
+    user: www-data
+    command: ["php", "artisan", "schedule:work"]
 
   web:
     build:
